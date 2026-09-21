@@ -1,0 +1,8 @@
+{
+    "uuid": "panel_mod@local",
+    "settings-schema": "org.gnome.shell.extensions.panel_mod",
+    "name": "Panel Modifier",
+    "description": "A compact alternative panel for GNOME Shell with adjustable layout, auto-hide behavior, and streamlined controls.",
+    "shell-version": ["45", "46", "47", "48", "49", "50"],
+    "url": "https://github.com/Monnomax/Panel_Modifier.git"
+}

@@ -1,0 +1,436 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+    <enum id="org.gnome.shell.extensions.panel_mod.AutohideBehavior">
+        <value nick="all" value="0" />
+        <value nick="focused" value="1" />
+        <value nick="maximized" value="2" />
+    </enum>
+
+    <schema id="org.gnome.shell.extensions.panel_mod"
+        path="/org/gnome/shell/extensions/panel_mod/">
+
+        <key name="panel-position" type="s">
+            <default>'bottom'</default>
+        </key>
+
+        <key name="hide-dash" type="b">
+            <default>true</default>
+        </key>
+
+        <key name="panel-height" type="i">
+            <default>60</default>
+        </key>
+
+        <key name="panel-width" type="i">
+            <default>100</default>
+        </key>
+
+        <key name="panel-adaptive-color-enabled" type="b">
+            <default>false</default>
+            <summary>Увімкнути адаптивний колір панелі</summary>
+        </key>
+
+        <key name="panel-adaptive-color-intensity" type="i">
+            <default>50</default>
+            <summary>Інтенсивність адаптивного кольору панелі (0-100)</summary>
+        </key>
+
+        <key name="dynamic-panel-width" type="b">
+            <default>true</default>
+            <summary>Динамічна ширина панелі</summary>
+            <description>Якщо увімкнено, ширина панелі автоматично підлаштовується під кількість
+                іконок
+                (ігнорується відсоток).</description>
+        </key>
+
+        <key name="show-activities-button" type="b">
+            <default>false</default>
+            <summary>Показувати кнопку Activities</summary>
+        </key>
+
+        <key name="hide-panel-in-overview" type="b">
+            <default>true</default>
+            <summary>Приховувати панель в Overview</summary>
+        </key>
+
+        <key name="show-a11y-button" type="b">
+            <default>false</default>
+            <summary>Показувати кнопку меню доступності</summary>
+            <description>Якщо вимкнено, кнопка меню доступності (a11y) завжди прихована на панелі,
+                незалежно від інших умов.</description>
+        </key>
+
+        <key name="margin-top" type="i">
+            <default>10</default>
+        </key>
+
+        <key name="margin-right" type="i">
+            <default>10</default>
+        </key>
+
+        <key name="margin-bottom" type="i">
+            <default>10</default>
+        </key>
+
+        <key name="margin-left" type="i">
+            <default>10</default>
+        </key>
+
+        <key name="icon-padding-vertical" type="i">
+            <default>7</default>
+            <summary>Внутрішній відступ іконки зверху та знизу</summary>
+        </key>
+
+        <key name="icon-padding-horizontal" type="i">
+            <default>2</default>
+            <summary>Внутрішній відступ іконки справа та зліва</summary>
+        </key>
+
+        <key name="border-radius-top-left" type="i">
+            <default>15</default>
+        </key>
+
+        <key name="border-radius-top-right" type="i">
+            <default>15</default>
+        </key>
+
+        <key name="border-radius-bottom-right" type="i">
+            <default>15</default>
+        </key>
+
+        <key name="border-radius-bottom-left" type="i">
+            <default>15</default>
+        </key>
+
+        <!-- Icon sizing/padding keys removed; managed internally or deprecated -->
+
+        <key name="indicator-active-height" type="i">
+            <default>4</default>
+            <summary>Висота активного індикатора</summary>
+        </key>
+
+        <key name="indicator-active-width" type="i">
+            <default>30</default>
+            <summary>Ширина активного індикатора</summary>
+        </key>
+
+        <key name="indicator-active-radius" type="i">
+            <default>2</default>
+            <summary>Радіус кутів активного індикатора</summary>
+        </key>
+
+        <key name="indicator-inactive-height" type="i">
+            <default>4</default>
+            <summary>Висота неактивного індикатора</summary>
+        </key>
+
+        <key name="indicator-inactive-width" type="i">
+            <default>20</default>
+            <summary>Ширина неактивного індикатора</summary>
+        </key>
+
+        <key name="indicator-inactive-radius" type="i">
+            <default>2</default>
+            <summary>Радіус кутів неактивного індикатора</summary>
+        </key>
+
+        <key name="autohide-enabled" type="b">
+            <default>true</default>
+            <summary>Увімкнути автоприховування панелі</summary>
+        </key>
+
+        <key name="intelligent-autohide" type="b">
+            <default>true</default>
+            <summary>Інтелектуальне автоприховування (приховувати, коли немає вікон)</summary>
+        </key>
+
+        <key name="autohide-delay" type="i">
+            <default>0</default>
+            <summary>Затримка автоприховування (мс)</summary>
+        </key>
+
+        <key name="separator-left-enabled" type="b">
+            <default>true</default>
+            <summary>Увімкнути лівий роздільник</summary>
+        </key>
+
+        <key name="separator-left-margin-top" type="i">
+            <default>0</default>
+        </key>
+
+        <key name="separator-left-margin-bottom" type="i">
+            <default>0</default>
+        </key>
+
+        <key name="separator-left-margin-left" type="i">
+            <default>15</default>
+        </key>
+
+        <key name="separator-left-margin-right" type="i">
+            <default>15</default>
+        </key>
+
+        <key name="separator-left-line-width" type="i">
+            <default>1</default>
+        </key>
+
+        <key name="separator-left-line-height" type="i">
+            <default>20</default>
+        </key>
+
+        <key name="separator-left-border-radius" type="i">
+            <default>0</default>
+        </key>
+
+        <key name="separator-right-enabled" type="b">
+            <default>true</default>
+            <summary>Увімкнути правий роздільник</summary>
+        </key>
+
+        <key name="separator-right-margin-top" type="i">
+            <default>0</default>
+        </key>
+
+        <key name="separator-right-margin-bottom" type="i">
+            <default>0</default>
+        </key>
+
+        <key name="separator-right-margin-left" type="i">
+            <default>15</default>
+        </key>
+
+        <key name="separator-right-margin-right" type="i">
+            <default>15</default>
+        </key>
+
+        <key name="separator-right-line-width" type="i">
+            <default>1</default>
+        </key>
+
+        <key name="separator-right-line-height" type="i">
+            <default>20</default>
+        </key>
+
+        <key name="separator-right-border-radius" type="i">
+            <default>0</default>
+        </key>
+
+        <key name="autohide-threshold" type="i">
+            <default>5</default>
+            <summary>Activation threshold</summary>
+            <description>Distance from the edge in pixels to trigger the panel</description>
+        </key>
+
+        <key name="autohide-show-delay" type="i">
+            <default>0</default>
+            <summary>Show delay</summary>
+            <description>Delay in milliseconds before showing the panel</description>
+        </key>
+
+        <key name="autohide-show-duration" type="i">
+            <default>200</default>
+            <summary>Тривалість анімації появи (мс)</summary>
+        </key>
+
+        <key name="autohide-hide-duration" type="i">
+            <default>200</default>
+            <summary>Тривалість анімації приховування (мс)</summary>
+        </key>
+
+        <key name="autohide-behavior" enum="org.gnome.shell.extensions.panel_mod.AutohideBehavior">
+            <default>'all'</default>
+            <summary>Режим інтелектуального приховування</summary>
+            <description>
+                Визначає, на які вікна реагуватиме панель:
+                all - на всі вікна, що перетинають зону панелі;
+                focused - тільки на активне вікно;
+                maximized - тільки на розгорнуті на весь екран вікна.
+            </description>
+        </key>
+
+        <key name="panel-element-order" type="s">
+            <default>'["dateMenu", "activities", "left_extensions", "left_center_extensions",
+                "taskbar",
+                "right_center_extensions", "right_extensions", "keyboard", "systemMenu"]'</default>
+            <summary>Порядок елементів на панелі (JSON)</summary>
+        </key>
+
+        <key name="show-tooltips" type="b">
+            <default>false</default>
+            <summary>Показувати текстові підказки</summary>
+        </key>
+
+        <key name="tooltip-animation" type="i">
+            <default>6</default>
+            <summary>Тип анімації підказок</summary>
+            <description>0 = Back, 1 = Bounce, 2 = Circ, 3 = Cubic, 4 = Elastic, 5 = Expo, 6 =
+                Linear, 7 =
+                Quad, 8 =
+                Quart, 9 = Quint, 10 = Sine</description>
+        </key>
+
+        <key name="tooltip-show-delay" type="i">
+            <default>500</default>
+            <summary>Затримка появи підказок (мс)</summary>
+            <description>Час очікування перед показом підказки після наведення курсора.</description>
+        </key>
+
+        <key name="tooltip-hide-delay" type="i">
+            <default>50</default>
+            <summary>Затримка приховування підказок (мс)</summary>
+            <description>Час очікування перед приховуванням підказки після того, як курсор покинув
+                елемент.</description>
+        </key>
+
+        <key name="tooltip-show-speed" type="i">
+            <default>200</default>
+            <summary>Швидкість появи підказок (мс)</summary>
+        </key>
+
+        <key name="tooltip-hide-speed" type="i">
+            <default>200</default>
+            <summary>Швидкість приховування підказок (мс)</summary>
+        </key>
+
+        <key name="show-previews" type="b">
+            <default>false</default>
+            <summary>Показувати прев'ю вікон</summary>
+        </key>
+
+        <key name="preview-animation" type="i">
+            <default>6</default>
+            <summary>Тип анімації прев'ю</summary>
+            <description>0 = Back, 1 = Bounce, 2 = Circ, 3 = Cubic, 4 = Elastic, 5 = Expo, 6 =
+                Linear, 7 =
+                Quad, 8 =
+                Quart, 9 = Quint, 10 = Sine</description>
+        </key>
+
+        <key name="preview-show-delay" type="i">
+            <default>500</default>
+            <summary>Затримка появи прев'ю (мс)</summary>
+            <description>Час очікування перед показом прев'ю вікон після наведення курсора.</description>
+        </key>
+
+        <key name="preview-hide-delay" type="i">
+            <default>50</default>
+            <summary>Затримка приховування прев'ю (мс)</summary>
+            <description>Час очікування перед приховуванням прев'ю після того, як курсор покинув
+                елемент.</description>
+        </key>
+
+        <key name="preview-show-speed" type="i">
+            <default>200</default>
+            <summary>Швидкість появи прев'ю (мс)</summary>
+        </key>
+
+        <key name="preview-hide-speed" type="i">
+            <default>200</default>
+            <summary>Швидкість приховування прев'ю (мс)</summary>
+        </key>
+        <key name="preview-base-size" type="i">
+            <default>300</default>
+            <summary>Базовий розмір прев'ю</summary>
+            <description>Основна ширина картки прев'ю (px).</description>
+        </key>
+
+        <key name="preview-base-size-group" type="i">
+            <default>300</default>
+            <summary>Базовий розмір прев'ю в груповому режимі</summary>
+            <description>Основна ширина картки прев'ю коли відкрито кілька вікон (px).</description>
+        </key>
+
+        <key name="taskbar-position" type="s">
+            <default>'center'</default>
+            <summary>Taskbar position</summary>
+            <description>Position of the taskbar when dynamic width is off (left, center, right)</description>
+        </key>
+
+        <key name="indicator-active-dynamic-color" type="b">
+            <default>false</default>
+            <summary>Use adaptive color for active indicator</summary>
+        </key>
+
+        <key name="indicator-inactive-dynamic-color" type="b">
+            <default>false</default>
+            <summary>Use adaptive color for inactive indicator</summary>
+        </key>
+
+        <key name="indicator-position" type="s">
+            <default>'bottom'</default>
+            <summary>Позиція індикатора запущеної програми</summary>
+            <description>Розміщення індикатора відносно іконки: зверху або знизу (top/bottom).</description>
+        </key>
+
+        <key name="autohide-animation" type="s">
+            <default>'Linear'</default>
+            <summary>Тип анімації для панелі</summary>
+            <description>Визначає криву анімації при показі та приховуванні панелі.</description>
+        </key>
+
+        <key name="animation-custom-settings" type="s">
+            <default>'{}'</default>
+            <summary>JSON storage for per-animation speeds</summary>
+        </key>
+
+        <key name="icon-animation" type="i">
+            <default>6</default>
+            <summary>Тип анімації іконок таскбару (наведення)</summary>
+            <description>0 = Back, 1 = Bounce, 2 = Circ, 3 = Cubic, 4 = Elastic, 5 = Expo, 6 =
+                Linear, 7 =
+                Quad, 8 =
+                Quart, 9 = Quint, 10 = Sine</description>
+        </key>
+
+        <key name="icon-press-animation" type="i">
+            <default>6</default>
+            <summary>Тип анімації іконок таскбару (натиснення)</summary>
+            <description>0 = Back, 1 = Bounce, 2 = Circ, 3 = Cubic, 4 = Elastic, 5 = Expo, 6 =
+                Linear, 7 =
+                Quad, 8 =
+                Quart, 9 = Quint, 10 = Sine</description>
+        </key>
+
+        <key name="icon-hover-show-speed" type="i">
+            <default>200</default>
+            <summary>Швидкість анімації при наведенні (мс)</summary>
+        </key>
+
+        <key name="icon-hover-hide-speed" type="i">
+            <default>200</default>
+            <summary>Швидкість анімації при відведенні (мс)</summary>
+        </key>
+
+        <key name="icon-press-show-speed" type="i">
+            <default>200</default>
+            <summary>Швидкість анімації при натисканні (мс)</summary>
+        </key>
+
+        <key name="icon-press-hide-speed" type="i">
+            <default>200</default>
+            <summary>Швидкість анімації при відпусканні (мс)</summary>
+        </key>
+
+        <key name="icon-scale-hover" type="d">
+            <default>1.1</default>
+        </key>
+        <key name="icon-scale-press" type="d">
+            <default>0.9</default>
+        </key>
+
+        <key name="layout-debug" type="b">
+            <default>false</default>
+            <summary>Увімкнути режим налагодження розташування</summary>
+        </key>
+
+        <key name="menu-hover-switch-enabled" type="b">
+            <default>true</default>
+            <summary>Автоматичне перемикання між відкритими меню</summary>
+            <description>Якщо увімкнено, наведення курсора на іншу кнопку статус-області (наприклад,
+                Quick Settings) під час відкритого меню автоматично перемикає на нього. Якщо
+                вимкнено,
+                для перемикання потрібно клікнути.</description>
+        </key>
+
+    </schema>
+</schemalist>
