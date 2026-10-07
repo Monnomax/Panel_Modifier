@@ -1050,7 +1050,7 @@ const Taskbar = GObject.registerClass(
 
             const rightFade = g.currentOffset < g.maxOffset - epsilon;
 
-            effect.setFade(leftFade, rightFade, 32);
+            effect.setFade(leftFade, rightFade, 48);
         }
 
         // ── Керування курсором ───────────────────────────────────────────
@@ -1119,6 +1119,15 @@ const Taskbar = GObject.registerClass(
                     }
                     return true;
                 });
+            }
+
+            if (this._fadeEffect) {
+                try {
+                    this._fadeEffect.stopAnimation();
+                    this.remove_effect(this._fadeEffect);
+                } catch (e) {}
+
+                this._fadeEffect = null;
             }
 
             if (this._fadeEffect) {
