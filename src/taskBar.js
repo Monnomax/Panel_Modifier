@@ -13,6 +13,7 @@ import { Tooltip } from "./tooltip.js";
 import { WindowPreview } from "./preview.js";
 import { AnimationManager } from "./animationManager.js";
 import { TaskbarGeometryManager } from "./geometryManager.js";
+import { TaskbarFadeEffect } from "./fadeEffect.js";
 
 function safeDisconnectSignal(obj, id) {
     if (!obj || id == null || typeof obj.disconnect !== "function") {
@@ -43,7 +44,9 @@ function safeDisconnectSignal(obj, id) {
             message.includes("destroyed");
 
         if (!isExpectedDisposalError) {
-            console.warn(`Panel Modifier: Failed to disconnect signal: ${message}`);
+            console.warn(
+                `Panel Modifier: Failed to disconnect signal: ${message}`,
+            );
         }
     }
 }
@@ -859,6 +862,21 @@ const Taskbar = GObject.registerClass(
 
             this._geometry = new TaskbarGeometryManager(this);
 
+            this._fadeEffect = null;
+
+            try {
+                this._fadeEffect = new TaskbarFadeEffect();
+                this._fadeEffect.set_enabled(false);
+                this.add_effect(this._fadeEffect);
+            } catch (e) {
+                console.warn(
+                    `Panel Modifier: Taskbar fade shader unavailable: ${e.message}`,
+                );
+            }
+
+            this._signals = [];
+            this._hookGeometrySignals();
+
             this._signals = [];
             this._hookGeometrySignals();
 
@@ -1009,6 +1027,30 @@ const Taskbar = GObject.registerClass(
             if (!g || !this._content) return;
 
             this._content.translation_x = -g.currentOffset;
+
+            this._applyFade();
+        }
+
+        _applyFade() {
+            const g = this._geometry;
+            const effect = this._fadeEffect;
+
+            if (!g || !effect) return;
+
+            /*
+             * Якщо content прокручений вправо від початкової позиції,
+             * зліва вже є прихований контент.
+             *
+             * Якщо ще не дійшли до правого краю,
+             * справа теж є прихований контент.
+             */
+            const epsilon = 0.5;
+
+            const leftFade = g.currentOffset > epsilon;
+
+            const rightFade = g.currentOffset < g.maxOffset - epsilon;
+
+            effect.setFade(leftFade, rightFade, 32);
         }
 
         // ── Керування курсором ───────────────────────────────────────────
@@ -1069,9 +1111,6 @@ const Taskbar = GObject.registerClass(
         }
 
         destroy() {
-            // Відʼєднуємо сигнали від _content ДО його знищення —
-            // інакше _onDestroy зверталась би до вже disposed актора,
-            // викликаючи C-рівневий GLib warning навіть попри JS try/catch.
             if (this._content) {
                 this._signals = this._signals.filter(({ obj, id }) => {
                     if (obj === this._content) {
@@ -1082,17 +1121,20 @@ const Taskbar = GObject.registerClass(
                 });
             }
 
-            // ВАЖЛИВО: TaskbarContent.destroy() відключає власні сигнали
-            // (AppFavorites, global.display, Shell.AppSystem, GSettings) і
-            // знищує TaskbarDNDManager. Базовий Clutter.Actor.destroy()
-            // нижче лише прибирає дерево акторів — він НЕ викликає
-            // перевизначений JS-метод destroy() дочірніх акторів, тож без
-            // явного виклику тут ці сигнали "протечуть".
+            if (this._fadeEffect) {
+                try {
+                    this.remove_effect(this._fadeEffect);
+                } catch (e) {}
+
+                this._fadeEffect = null;
+            }
+
             if (this._content && !this._content.is_finalized?.()) {
                 try {
                     this._content.destroy();
                 } catch (e) {}
             }
+
             this._content = null;
 
             super.destroy();
