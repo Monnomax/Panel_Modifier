@@ -112,7 +112,26 @@ const TaskbarContent = GObject.registerClass(
                         let appFavorites = AppFavorites.getAppFavorites();
                         if (appFavorites) {
                             if (appFavorites.isFavorite(appId)) {
-                                appFavorites.moveFavoriteToPos(appId, index);
+                                // Переставляємо улюблену програму одним оновленням.
+                                // moveFavoriteToPos() спочатку видаляє програму,
+                                // а потім додає її знову, спричиняючи два оновлення GNOME.
+                                const key = appFavorites.FAVORITE_APPS_KEY;
+                                const favoriteIds =
+                                    global.settings.get_strv(key);
+                                const oldIndex = favoriteIds.indexOf(appId);
+
+                                if (oldIndex !== -1) {
+                                    favoriteIds.splice(oldIndex, 1);
+
+                                    const newIndex = Math.max(
+                                        0,
+                                        Math.min(index, favoriteIds.length),
+                                    );
+
+                                    favoriteIds.splice(newIndex, 0, appId);
+
+                                    global.settings.set_strv(key, favoriteIds);
+                                }
                             } else {
                                 this._temporaryFavorites.add(appId);
                                 appFavorites.addFavoriteAtPos(appId, index);
