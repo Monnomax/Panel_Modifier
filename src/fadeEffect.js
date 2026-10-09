@@ -3,7 +3,7 @@ import GLib from "gi://GLib";
 import GObject from "gi://GObject";
 import Shell from "gi://Shell";
 
-const FADE_DURATION_US = 500_000;
+const FADE_DURATION_US = 200_000;
 const FRAME_INTERVAL_MS = 16;
 
 const DECLARATIONS = `
@@ -29,10 +29,6 @@ if (fade_width > 0.00001) {
     }
 }
 
-/*
- * Cogl використовує premultiplied alpha, тому множимо
- * весь вихідний колір, а не лише alpha.
- */
 cogl_color_out *= fade;
 `;
 
@@ -78,10 +74,6 @@ export const TaskbarFadeEffect = GObject.registerClass(
             const actor = this.actor;
             const actorWidth = actor?.get_width?.() ?? 0;
 
-            /*
-             * Shader працює з нормалізованими texture coordinates 0..1,
-             * тому переводимо 32 px у нормалізовану ширину.
-             */
             const normalizedWidth =
                 actorWidth > 0
                     ? Math.min(0.5, Math.max(0, fadeWidthPx / actorWidth))
@@ -100,7 +92,10 @@ export const TaskbarFadeEffect = GObject.registerClass(
             if (left === this._targetLeft && right === this._targetRight) {
                 this.set_enabled(
                     normalizedWidth > 0 &&
-                        (left || right || this._leftFade > 0 || this._rightFade > 0),
+                        (left ||
+                            right ||
+                            this._leftFade > 0 ||
+                            this._rightFade > 0),
                 );
                 this.queue_repaint();
                 return;
@@ -155,7 +150,8 @@ export const TaskbarFadeEffect = GObject.registerClass(
                 () => {
                     const progress = Math.min(
                         1,
-                        (GLib.get_monotonic_time() - startedAt) / FADE_DURATION_US,
+                        (GLib.get_monotonic_time() - startedAt) /
+                            FADE_DURATION_US,
                     );
                     const easedProgress =
                         progress * progress * (3 - 2 * progress);
@@ -172,8 +168,7 @@ export const TaskbarFadeEffect = GObject.registerClass(
                     if (progress < 1) return GLib.SOURCE_CONTINUE;
 
                     this._animationId = 0;
-                    if (!targetLeft && !targetRight)
-                        this.set_enabled(false);
+                    if (!targetLeft && !targetRight) this.set_enabled(false);
                     return GLib.SOURCE_REMOVE;
                 },
             );
