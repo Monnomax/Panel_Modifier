@@ -1075,22 +1075,6 @@ export default class MyPrefs extends ExtensionPreferences {
         renderList();
         settings.connect("changed::panel-element-order", renderList);
 
-        const debugGroup = new Adw.PreferencesGroup({
-            title: "Режим розробника",
-        });
-        page.add(debugGroup);
-
-        const debugRow = new Adw.SwitchRow({
-            title: "Увімкнути дебаг",
-        });
-        settings.bind(
-            "layout-debug",
-            debugRow,
-            "active",
-            Gio.SettingsBindFlags.DEFAULT,
-        );
-        debugGroup.add(debugRow);
-
         // --- ГРУПА: НАЛАШТУВАННЯ ---
         const settingsActionsGroup = new Adw.PreferencesGroup({
             title: "Налаштування",
@@ -1183,7 +1167,6 @@ export default class MyPrefs extends ExtensionPreferences {
                     e.matches(Gtk.DialogError, Gtk.DialogError.DISMISSED)
                 )
                     return;
-                logError(e, "Не вдалося експортувати налаштування");
             }
         });
     }
@@ -1225,7 +1208,7 @@ export default class MyPrefs extends ExtensionPreferences {
                         );
                         settings.set_value(key, variant);
                     } catch (e) {
-                        logError(e, `Не вдалося імпортувати ключ "${key}"`);
+                        // Ignore invalid imported values for keys that no longer exist.
                     }
                 }
             } catch (e) {
@@ -1234,7 +1217,6 @@ export default class MyPrefs extends ExtensionPreferences {
                     e.matches(Gtk.DialogError, Gtk.DialogError.DISMISSED)
                 )
                     return;
-                logError(e, "Не вдалося імпортувати налаштування");
             }
         });
     }

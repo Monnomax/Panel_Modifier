@@ -440,11 +440,6 @@
             <default>0.9</default>
         </key>
 
-        <key name="layout-debug" type="b">
-            <default>false</default>
-            <summary>Увімкнути режим налагодження розташування</summary>
-        </key>
-
         <key name="menu-hover-switch-enabled" type="b">
             <default>true</default>
             <summary>Автоматичне перемикання між відкритими меню</summary>

@@ -63,10 +63,7 @@ export class ElementRouter {
             );
             if (Array.isArray(order) && order.length) return order;
         } catch (e) {
-            console.error(
-                "Panel Modifier: Failed to parse panel-element-order, using default",
-                e,
-            );
+            // Ignore invalid stored order and fall back to the default layout.
         }
         return this._getDefaultOrder();
     }
@@ -225,7 +222,7 @@ export class ElementRouter {
                     }
                     validChildren.push(child);
                 } catch (e) {
-                    console.warn(`Error removing child from ${boxName}:`, e);
+                    // Ignore child removal errors during a layout refresh.
                 }
             });
 
@@ -464,7 +461,7 @@ export class ElementRouter {
                 }
             }
         } catch (e) {
-            console.warn(`Error reparenting child: ${e.message}`);
+            // Ignore reparenting errors while the layout is being rebuilt.
         }
     }
 
@@ -540,7 +537,6 @@ export class ElementRouter {
     }
 
     _redistributeChildren() {
-        console.log("Starting child redistribution...");
         this._extension._originalChildren.forEach((children, boxName) => {
             children.forEach((child, idx) => {
                 if (child && !child.is_finalized?.()) {
@@ -637,9 +633,7 @@ export class ElementRouter {
 
                         if (isValid) zone.remove_child(c);
                     } catch (e) {
-                        console.warn(
-                            `Panel Modifier: Failed to clear child during refresh: ${e.message}`,
-                        );
+                        // Ignore failed child cleanup during a refresh.
                     }
                 });
             });
@@ -773,9 +767,7 @@ export class ElementRouter {
                         item.obj.show();
                     }
                 } catch (e) {
-                    console.warn(
-                        `Panel Modifier: Could not move item ${item.id}: ${e.message}`,
-                    );
+                    // Ignore item reordering failures during a layout refresh.
                 }
             }
         });

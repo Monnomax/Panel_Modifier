@@ -48,7 +48,7 @@ function safeDisconnectSignal(signalRecord) {
             message.includes("destroyed");
 
         if (!isExpectedDisposalError) {
-            console.warn(`Panel Modifier: Failed to disconnect signal: ${message}`);
+            // Intentionally silent: avoid noisy diagnostics in production.
         }
     }
 }
@@ -67,8 +67,6 @@ export default class PanelLayoutExtension extends Extension {
         this._elementRouter = new ElementRouter(this);
         this._systemUIManager = new SystemUIManager(this);
         this._lifecycleManager = new LifecycleManager(this);
-
-        console.log("Panel Modifier: Enabling...");
 
         // Виклики методів через відповідний менеджер розмітки
         this._layoutManager._createMasterContainer();
@@ -119,21 +117,10 @@ export default class PanelLayoutExtension extends Extension {
         );
         this._signals.push({ obj: this._settings, id: orderId });
 
-        const debugSignalId = this._settings.connect(
-            "changed::layout-debug",
-            () => {
-                this._layoutManager._updateDebugVisuals();
-            },
-        );
-        this._signals.push({ obj: this._settings, id: debugSignalId });
-
         // Викликаємо один раз при запуску розширення, щоб врахувати збережений стан
-        this._layoutManager._updateDebugVisuals();
     }
 
     disable() {
-        console.log("Panel Modifier: Disabling...");
-
         if (this._timeoutId) {
             GLib.source_remove(this._timeoutId);
             this._timeoutId = 0;
@@ -198,11 +185,7 @@ export default class PanelLayoutExtension extends Extension {
                         Main.panel[boxName].visible = true;
                     }
                 });
-            } catch (e) {
-                console.error(
-                    `Panel Modifier: Error restoring Main.panel: ${e.message}`,
-                );
-            }
+            } catch (e) {}
         }
 
         this._layoutManager._cleanup();

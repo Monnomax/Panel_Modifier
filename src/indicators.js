@@ -29,7 +29,6 @@ export function getAverageAppIconColor(app) {
 
         return { r: pixels[0], g: pixels[1], b: pixels[2] };
     } catch (e) {
-        console.log(`Panel Modifier: Помилка отримання кольору іконки: ${e.message}`);
         return null;
     }
 }

@@ -380,80 +380,6 @@ export class LayoutManager {
     }
 
     // =====================================================
-    // Debug-візуалізація секцій та зон
-    // =====================================================
-
-    _updateDebugVisuals() {
-        if (!this._extension._settings) return;
-
-        const isDebugEnabled =
-            this._extension._settings.get_boolean("layout-debug");
-
-        // Кольори для рамок секцій (ліва, середня, права)
-        const sectionColors = {
-            left: "rgba(255, 0, 0, 0.75)", // Червоний
-            center: "rgba(255, 255, 0, 0.75)", // Жовтий
-            right: "rgba(0, 255, 0, 0.75)", // Зелений
-        };
-
-        // Кольори для напівпрозорого тла зон всередині секцій
-        const zoneColors = {
-            left: "rgba(255, 0, 0, 0.25)",
-            center: "rgba(255, 255, 0, 0.25)",
-            right: "rgba(0, 255, 0, 0.25)",
-        };
-
-        // 1. Обробка секцій (masterContainer)
-        if (this._extension._sections) {
-            Object.entries(this._extension._sections).forEach(
-                ([sectionName, sectionActor]) => {
-                    if (
-                        !sectionActor ||
-                        typeof sectionActor.set_style !== "function"
-                    )
-                        return;
-
-                    if (isDebugEnabled) {
-                        sectionActor.set_style(
-                            `border: 1px solid ${sectionColors[sectionName]};`,
-                        );
-                    } else {
-                        sectionActor.set_style(null);
-                    }
-                },
-            );
-        }
-
-        // 2. Обробка зон всередині секцій
-        if (this._extension._zones) {
-            Object.entries(this._extension._zones).forEach(
-                ([sectionName, zonesArray]) => {
-                    if (!zonesArray || !Array.isArray(zonesArray)) return;
-
-                    zonesArray.forEach((zoneActor) => {
-                        if (
-                            !zoneActor ||
-                            typeof zoneActor.set_style !== "function"
-                        )
-                            return;
-
-                        if (isDebugEnabled) {
-                            zoneActor.set_style(
-                                `background-color: ${zoneColors[sectionName]}; ` +
-                                    `border: 1px dashed ${sectionColors[sectionName]}; ` +
-                                    `margin: 1px; ` +
-                                    `min-width: 20px;`,
-                            );
-                        } else {
-                            zoneActor.set_style(null);
-                        }
-                    });
-                },
-            );
-        }
-    }
-
-    // =====================================================
     // Відновлення оригінальної розкладки панелі (disable())
     // =====================================================
 
@@ -491,9 +417,7 @@ export class LayoutManager {
                         child.show();
                     }
                 } catch (e) {
-                    console.warn(
-                        `Failed to restore child in ${boxName}: ${e.message}`,
-                    );
+                    // Ignore restoration failures for already-disposed children.
                 }
             });
         });
@@ -555,7 +479,7 @@ export class LayoutManager {
                     actor.destroy();
                 }
             } catch (e) {
-                console.warn(`Error during safeDestroy: ${e.message}`);
+                // Ignore disposal errors for already-destroyed actors.
             }
         };
 

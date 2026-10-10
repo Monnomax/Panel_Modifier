@@ -261,9 +261,6 @@ export class AutoHideManager {
         if (!panelBox) return;
 
         if (isNaN(destination)) {
-            console.warn(
-                "Panel Modifier: Спроба анімації до NaN. Оновлюємо координати...",
-            );
             this._updateCoords();
             destination = this._panelVisible ? this._yShow : this._yHide;
 

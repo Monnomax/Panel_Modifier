@@ -3,7 +3,7 @@ import GLib from "gi://GLib";
 import GObject from "gi://GObject";
 import Shell from "gi://Shell";
 
-const FADE_DURATION_US = 200_000;
+const FADE_DURATION_US = 500_000;
 const FRAME_INTERVAL_MS = 16;
 
 const DECLARATIONS = `
@@ -61,10 +61,6 @@ export const TaskbarFadeEffect = GObject.registerClass(
 
                 return true;
             } catch (e) {
-                console.warn(
-                    `Panel Modifier: Failed to initialize taskbar fade uniforms: ${e.message}`,
-                );
-
                 this._u = null;
                 return false;
             }

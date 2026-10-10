@@ -14,8 +14,6 @@ export class LifecycleManager {
     // =====================================================
 
     _finalizeStartup() {
-        console.log("Panel Modifier: Finalizing startup...");
-
         const ext = this._extension;
 
         ext._elementRouter._extractOriginalChildren();
@@ -42,7 +40,6 @@ export class LifecycleManager {
         ext._taskbar.x_align = Clutter.ActorAlign.CENTER;
 
         ext._elementRouter._reparentChildSync(ext._taskbar, "_centerBox");
-        console.log("Taskbar added to dynamic layout");
 
         ext._taskbar._redisplay();
         if (ext._autoHideManager) {
@@ -65,9 +62,6 @@ export class LifecycleManager {
                 : ext._settings;
 
         if (!sObj || typeof sObj.connect !== "function") {
-            console.error(
-                "Panel Modifier: Could not find a valid settings object to connect signals",
-            );
             return;
         }
 

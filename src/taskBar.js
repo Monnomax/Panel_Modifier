@@ -44,9 +44,7 @@ function safeDisconnectSignal(obj, id) {
             message.includes("destroyed");
 
         if (!isExpectedDisposalError) {
-            console.warn(
-                `Panel Modifier: Failed to disconnect signal: ${message}`,
-            );
+            // Ignore unexpected disposal errors silently.
         }
     }
 }
@@ -751,7 +749,7 @@ const TaskbarContent = GObject.registerClass(
             try {
                 this._menu.open(true);
             } catch (e) {
-                logError(e);
+                // Ignore menu-opening failures; they are not user-facing errors.
             }
         }
 
@@ -888,9 +886,7 @@ const Taskbar = GObject.registerClass(
                 this._fadeEffect.set_enabled(false);
                 this.add_effect(this._fadeEffect);
             } catch (e) {
-                console.warn(
-                    `Panel Modifier: Taskbar fade shader unavailable: ${e.message}`,
-                );
+                // Ignore shader setup failures and keep the taskbar functional.
             }
 
             this._signals = [];
