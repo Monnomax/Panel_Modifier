@@ -6,7 +6,6 @@ import Clutter from "gi://Clutter";
 import GLib from "gi://GLib";
 import { TaskbarDNDManager } from "./DND.js";
 import * as AppMenu from "resource:///org/gnome/shell/ui/appMenu.js";
-import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 import GObject from "gi://GObject";
 import { WindowIndicators } from "./indicators.js";
 import { Tooltip } from "./tooltip.js";
@@ -14,6 +13,8 @@ import { WindowPreview } from "./preview.js";
 import { AnimationManager } from "./animationManager.js";
 import { TaskbarGeometryManager } from "./geometryManager.js";
 import { TaskbarFadeEffect } from "./fadeEffect.js";
+
+const PANEL_HORIZONTAL_PADDING = 10;
 
 function safeDisconnectSignal(obj, id) {
     if (!obj || id == null || typeof obj.disconnect !== "function") {
@@ -58,7 +59,7 @@ function safeDisconnectSignal(obj, id) {
 // ═══════════════════════════════════════════════════════════════════════
 const TaskbarContent = GObject.registerClass(
     class TaskbarContent extends St.BoxLayout {
-        _init(extension, settings, extensionPath) {
+        _init(extension, settings) {
             super._init({
                 name: "customTaskbarContent",
                 style_class: "panel-taskbar",
@@ -72,12 +73,10 @@ const TaskbarContent = GObject.registerClass(
 
             this._extension = extension;
             this._settings = settings;
-            this._extensionPath = extensionPath;
             this._buttons = new Map();
             this._temporaryFavorites = new Set();
             this._dragActive = false;
             this._pendingRedisplay = false;
-            this._menuManager = new PopupMenu.PopupMenuManager(Main.panel);
 
             // Хук, який виставляє TaskBarViewport (див. клас Taskbar нижче),
             // щоб призупиняти автоскрол під час перетягування іконки.
@@ -397,42 +396,58 @@ const TaskbarContent = GObject.registerClass(
             return icon;
         }
 
-        _createButton(app) {
-            const computedSize =
-                typeof this._computedIconSize === "number"
-                    ? this._computedIconSize
-                    : null;
+        _getButtonMetrics() {
             const verticalPad = Math.max(
                 0,
                 this._settings.get_int("icon-padding-vertical"),
             );
+
             const horizontalPad = Math.max(
                 0,
                 this._settings.get_int("icon-padding-horizontal"),
             );
+
             const topPad = verticalPad;
             const rightPad = horizontalPad;
             const bottomPad = verticalPad;
             const leftPad = horizontalPad;
+
             const panelHeight = Math.max(
                 1,
                 this._settings.get_int("panel-height"),
             );
 
-            const availableIconHeight = Math.max(
-                1,
-                panelHeight - topPad - bottomPad,
-            );
-            const iconSize =
-                computedSize !== null
-                    ? Math.min(computedSize, availableIconHeight)
-                    : availableIconHeight;
+            const iconSize = Math.max(1, panelHeight - topPad - bottomPad);
+
             const radius = 0;
+
             const btnWidth = Math.max(1, iconSize + leftPad + rightPad);
 
             const btnStyle =
                 `border-radius: ${radius}px; padding: 0; margin: 0; ` +
                 `width: ${btnWidth}px; height: ${panelHeight}px;`;
+
+            return {
+                topPad,
+                rightPad,
+                bottomPad,
+                leftPad,
+                iconSize,
+                btnWidth,
+                btnStyle,
+            };
+        }
+
+        _createButton(app) {
+            const {
+                topPad,
+                rightPad,
+                bottomPad,
+                leftPad,
+                iconSize,
+                btnWidth,
+                btnStyle,
+            } = this._getButtonMetrics();
 
             let btn = new St.Button({
                 style_class: "panel-button",
@@ -641,43 +656,17 @@ const TaskbarContent = GObject.registerClass(
         }
 
         _updateButtonSizes() {
-            const computedSize =
-                typeof this._computedIconSize === "number"
-                    ? this._computedIconSize
-                    : null;
-            const verticalPad = Math.max(
-                0,
-                this._settings.get_int("icon-padding-vertical"),
-            );
-            const horizontalPad = Math.max(
-                0,
-                this._settings.get_int("icon-padding-horizontal"),
-            );
-            const topPad = verticalPad;
-            const rightPad = horizontalPad;
-            const bottomPad = verticalPad;
-            const leftPad = horizontalPad;
-            const panelHeight = Math.max(
-                1,
-                this._settings.get_int("panel-height"),
-            );
+            const {
+                topPad,
+                rightPad,
+                bottomPad,
+                leftPad,
+                iconSize,
+                btnWidth,
+                btnStyle,
+            } = this._getButtonMetrics();
 
-            const availableIconHeight = Math.max(
-                1,
-                panelHeight - topPad - bottomPad,
-            );
-            const iconSize =
-                computedSize !== null
-                    ? Math.min(computedSize, availableIconHeight)
-                    : availableIconHeight;
-            const radius = 0;
-            const btnWidth = Math.max(1, iconSize + leftPad + rightPad);
-
-            const btnStyle =
-                `border-radius: ${radius}px; padding: 0; margin: 0; ` +
-                `width: ${btnWidth}px; height: ${panelHeight}px;`;
-
-            for (let [app, btn] of this._buttons.entries()) {
+            for (const [app, btn] of this._buttons.entries()) {
                 if (!btn || btn.is_finalized?.()) continue;
 
                 btn._targetWidth = btnWidth;
@@ -689,7 +678,8 @@ const TaskbarContent = GObject.registerClass(
                 }
 
                 if (btn._btnContent) {
-                    let icon = this._createTaskbarIcon(app, iconSize);
+                    const icon = this._createTaskbarIcon(app, iconSize);
+
                     if (icon) {
                         icon.add_style_class_name("taskbar-app-icon");
                         icon.set_margin_top(topPad);
@@ -697,7 +687,7 @@ const TaskbarContent = GObject.registerClass(
                         icon.set_margin_bottom(bottomPad);
                         icon.set_margin_left(leftPad);
 
-                        // Додаємо на індекс 0, щоб іконка знаходилась під індикаторами
+                        // Іконка під індикаторами.
                         btn._btnContent.insert_child_at_index(icon, 0);
                         btn._icon = icon;
                     }
@@ -774,8 +764,6 @@ const TaskbarContent = GObject.registerClass(
                 this._dnd = null;
             }
 
-            this._menuManager = null;
-
             // Безпечне відключення глобальних сигналів за допомогою try-catch
             if (this._favsChangedId) {
                 const appFavs = AppFavorites.getAppFavorites();
@@ -808,28 +796,9 @@ const TaskbarContent = GObject.registerClass(
                 }
             });
 
-            // clear computed sizing overrides
-            this._computedIconSize = null;
-            this._computedIconHPad = null;
             this._extension = null;
 
             super.destroy();
-        }
-
-        _applyIconSizing(size, hpad, vpad) {
-            try {
-                if (typeof size === "number" && size > 0)
-                    this._computedIconSize = Math.max(1, Math.floor(size));
-                if (typeof hpad === "number" && !isNaN(hpad))
-                    this._computedIconHPad = Math.max(0, Math.floor(hpad));
-                if (typeof vpad === "number" && !isNaN(vpad))
-                    this._computedIconVPad = Math.max(0, Math.floor(vpad));
-
-                this._updateButtonSizes();
-            } catch (e) {
-                logWarn &&
-                    logWarn(`Taskbar: applyIconSizing failed: ${e.message}`);
-            }
         }
     },
 );
@@ -850,7 +819,7 @@ const TaskbarContent = GObject.registerClass(
 // ═══════════════════════════════════════════════════════════════════════
 const Taskbar = GObject.registerClass(
     class Taskbar extends St.Widget {
-        _init(extension, settings, extensionPath) {
+        _init(extension, settings) {
             super._init({
                 name: "customTaskbarViewport",
                 style_class: "panel-taskbar-viewport",
@@ -864,11 +833,8 @@ const Taskbar = GObject.registerClass(
             this._extension = extension;
             this._settings = settings;
 
-            this._content = new TaskbarContent(
-                extension,
-                settings,
-                extensionPath,
-            );
+            this._content = new TaskbarContent(extension, settings);
+
             this._content._onDragActiveChange = (active) => {
                 if (this._geometry) this._geometry.setDragActive(active);
             };
@@ -892,17 +858,9 @@ const Taskbar = GObject.registerClass(
             this._signals = [];
             this._hookGeometrySignals();
 
-            this._signals = [];
-            this._hookGeometrySignals();
+            this.connect("motion-event", this._onMotion.bind(this));
 
-            this._motionId = this.connect(
-                "motion-event",
-                this._onMotion.bind(this),
-            );
-            this._destroyId = this.connect(
-                "destroy",
-                this._onDestroy.bind(this),
-            );
+            this.connect("destroy", this._onDestroy.bind(this));
 
             // Відкладаємо перший вимір, щоб панель встигла отримати
             // реальну геометрію під час старту.
@@ -990,7 +948,7 @@ const Taskbar = GObject.registerClass(
             const mr = s.get_int("margin-right") || 0;
             // Той самий внутрішній padding, що встановлює
             // LayoutManager._applyPanelWidth() на Main.panel.
-            const horizontalPadding = 10;
+            const horizontalPadding = PANEL_HORIZONTAL_PADDING;
 
             return ml + mr + horizontalPadding;
         }
@@ -1014,7 +972,7 @@ const Taskbar = GObject.registerClass(
 
             const ml = s.get_int("margin-left") || 0;
             const mr = s.get_int("margin-right") || 0;
-            const horizontalPadding = 10;
+            const horizontalPadding = PANEL_HORIZONTAL_PADDING;
             const widthPct = s.get_int("panel-width") || 100;
 
             const availW = Math.max(
@@ -1096,18 +1054,8 @@ const Taskbar = GObject.registerClass(
             this._content._updateAllIndicators();
         }
 
-        _updateButtonSizes() {
-            this._content._updateButtonSizes();
-            if (this._geometry) this._geometry.scheduleMeasure();
-        }
-
         setReactive(reactive) {
             this._content.setReactive(reactive);
-        }
-
-        _applyIconSizing(size, hpad, vpad) {
-            this._content._applyIconSizing(size, hpad, vpad);
-            if (this._geometry) this._geometry.scheduleMeasure();
         }
 
         _onDestroy() {
@@ -1139,14 +1087,6 @@ const Taskbar = GObject.registerClass(
             if (this._fadeEffect) {
                 try {
                     this._fadeEffect.stopAnimation();
-                    this.remove_effect(this._fadeEffect);
-                } catch (e) {}
-
-                this._fadeEffect = null;
-            }
-
-            if (this._fadeEffect) {
-                try {
                     this.remove_effect(this._fadeEffect);
                 } catch (e) {}
 

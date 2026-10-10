@@ -35,7 +35,7 @@ export class LifecycleManager {
     _initializeTaskbar() {
         const ext = this._extension;
 
-        ext._taskbar = new Taskbar(ext, ext._settings, ext.path);
+        ext._taskbar = new Taskbar(ext, ext._settings);
         ext._taskbar.x_expand = false;
         ext._taskbar.x_align = Clutter.ActorAlign.CENTER;
 
