@@ -748,6 +748,7 @@ const TaskbarContent = GObject.registerClass(
         }
 
         destroy() {
+            // 1. Закриваємо контекстне меню.
             if (this._menu) {
                 try {
                     this._menu.destroy();
@@ -755,33 +756,39 @@ const TaskbarContent = GObject.registerClass(
                 this._menu = null;
             }
 
+            // 2. Знищуємо менеджер Drag & Drop.
             if (this._dnd) {
-                if (typeof this._dnd.destroy === "function") {
-                    try {
-                        this._dnd.destroy();
-                    } catch (e) {}
-                }
+                try {
+                    this._dnd.destroy();
+                } catch (e) {}
                 this._dnd = null;
             }
 
-            // Безпечне відключення глобальних сигналів за допомогою try-catch
+            // 3. Відключаємо сигнал зміни обраного.
             if (this._favsChangedId) {
-                const appFavs = AppFavorites.getAppFavorites();
-                safeDisconnectSignal(appFavs, this._favsChangedId);
+                safeDisconnectSignal(
+                    AppFavorites.getAppFavorites(),
+                    this._favsChangedId,
+                );
                 this._favsChangedId = null;
             }
 
+            // 4. Відключаємо сигнал зміни фокусованого вікна.
             if (this._focusSig) {
                 safeDisconnectSignal(global.display, this._focusSig);
                 this._focusSig = null;
             }
 
+            // 5. Відключаємо сигнал зміни стану програм.
             if (this._appStateChangedId) {
-                const appSys = Shell.AppSystem.get_default();
-                safeDisconnectSignal(appSys, this._appStateChangedId);
+                safeDisconnectSignal(
+                    Shell.AppSystem.get_default(),
+                    this._appStateChangedId,
+                );
                 this._appStateChangedId = null;
             }
 
+            // 6. Відключаємо сигнали налаштувань.
             if (this._settingsSignals) {
                 for (const id of this._settingsSignals) {
                     safeDisconnectSignal(this._settings, id);
@@ -789,14 +796,51 @@ const TaskbarContent = GObject.registerClass(
                 this._settingsSignals = null;
             }
 
-            const children = this.get_children() || [];
-            children.forEach((child) => {
-                if (child && !child.is_finalized?.()) {
-                    child.destroy();
-                }
-            });
+            // 7. Видаляємо тимчасові закладки цього таскбару.
+            const appFavorites = AppFavorites.getAppFavorites();
 
+            if (this._temporaryFavorites) {
+                if (appFavorites) {
+                    for (const appId of this._temporaryFavorites) {
+                        try {
+                            if (appFavorites.isFavorite(appId)) {
+                                appFavorites.removeFavorite(appId);
+                            }
+                        } catch (e) {
+                            // Ігноруємо помилки під час завершення роботи.
+                        }
+                    }
+                }
+
+                this._temporaryFavorites.clear();
+            }
+
+            // 8. Скасовуємо анімації та знищуємо дочірні актори.
+            const children = this.get_children() || [];
+
+            for (const child of children) {
+                if (!child || child.is_finalized?.()) continue;
+
+                try {
+                    child.remove_all_transitions();
+                    child.destroy();
+                } catch (e) {}
+            }
+
+            // 9. Звільняємо посилання на знищені кнопки.
+            this._buttons.clear();
+
+            // 10. Від'єднуємо callback-функції від батьківського Taskbar.
+            this._onDragActiveChange = null;
+            this._onButtonAdded = null;
+
+            // 11. Скидаємо внутрішній стан.
+            this._dragActive = false;
+            this._pendingRedisplay = false;
+
+            // 12. Звільняємо посилання на розширення та налаштування.
             this._extension = null;
+            this._settings = null;
 
             super.destroy();
         }
@@ -864,10 +908,18 @@ const Taskbar = GObject.registerClass(
 
             // Відкладаємо перший вимір, щоб панель встигла отримати
             // реальну геометрію під час старту.
-            GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-                if (this._geometry) this._geometry.measure();
-                return GLib.SOURCE_REMOVE;
-            });
+            this._initialMeasureId = GLib.idle_add(
+                GLib.PRIORITY_DEFAULT,
+                () => {
+                    this._initialMeasureId = 0;
+
+                    if (this._geometry) {
+                        this._geometry.measure();
+                    }
+
+                    return GLib.SOURCE_REMOVE;
+                },
+            );
         }
 
         // ── Підписки на все, що може вплинути на геометрію ──────────────
@@ -1059,6 +1111,11 @@ const Taskbar = GObject.registerClass(
         }
 
         _onDestroy() {
+            // Скасовуємо відкладений початковий вимір viewport.
+            if (this._initialMeasureId) {
+                GLib.source_remove(this._initialMeasureId);
+                this._initialMeasureId = 0;
+            }
             this._signals.forEach(({ obj, id }) => {
                 safeDisconnectSignal(obj, id);
             });

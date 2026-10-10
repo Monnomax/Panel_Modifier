@@ -251,11 +251,11 @@ class TaskbarDNDManager {
             button._oldStyle = button.get_style();
 
             this._dragSourceDestroyId = button.connect("destroy", () => {
-                this._dragSourceButton = null;
-            });
+                if (this._dragSourceButton === button) {
+                    this._dragSourceButton = null;
+                }
 
-            this._dragSourceDestroyId = button.connect("destroy", () => {
-                this._dragSourceButton = null;
+                this._dragSourceDestroyId = 0;
             });
         });
 
