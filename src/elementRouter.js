@@ -339,6 +339,45 @@ export class ElementRouter {
      * Якщо підказки немає — просто додає в кінець (поведінка за
      * замовчуванням для звичайного add_child без явної позиції).
      */
+    _isActorAlive(actor) {
+        try {
+            return (
+                !!actor &&
+                !actor._panelModifierIsDestroyed &&
+                !(
+                    typeof actor.is_finalized === "function" &&
+                    actor.is_finalized()
+                )
+            );
+        } catch (e) {
+            return false;
+        }
+    }
+
+    _isZoneAlive(zone) {
+        try {
+            return (
+                !!zone &&
+                !(
+                    typeof zone.is_finalized === "function" &&
+                    zone.is_finalized()
+                )
+            );
+        } catch (e) {
+            return false;
+        }
+    }
+
+    _getOrderBucket(index) {
+        if (index >= 0 && index < 3) return { section: "left", offset: index, align: Clutter.ActorAlign.START };
+        if (index >= 3 && index < 6) return { section: "center", offset: index - 3, align: Clutter.ActorAlign.CENTER };
+        return { section: "right", offset: Math.min(2, Math.max(0, index - 6)), align: Clutter.ActorAlign.END };
+    }
+
+    _getHorizontalAlignForOrderIndex(index) {
+        return this._getOrderBucket(index).align;
+    }
+
     _insertIntoZoneOrdered(zone, child, hint) {
         if (hint === undefined || hint === null) {
             zone.add_child(child);
@@ -470,14 +509,20 @@ export class ElementRouter {
      * 0-2 -> ліва секція, 3-5 -> центральна, 6-8 -> права.
      */
     _zoneForIndex(index) {
-        if (index >= 0 && index < 3) return this._extension._zones.left[index];
-        if (index >= 3 && index < 6)
-            return this._extension._zones.center[index - 3];
-        if (index >= 6 && index < 9)
-            return this._extension._zones.right[index - 6];
-        return (
-            this._extension._zones.right[2] || this._extension._zones.right[0]
+        const bucket = this._getOrderBucket(index);
+        const section = this._extension._zones?.[bucket.section];
+        return section?.[bucket.offset] ?? (
+            this._extension._zones?.right?.[2] ||
+            this._extension._zones?.right?.[0]
         );
+    }
+
+    _getZoneForOrderBucket(index, total) {
+        if (!total) return this._extension._zones.right[0];
+
+        if (index < total / 3) return this._extension._zones.left[0];
+        if (index < (total / 3) * 2) return this._extension._zones.center[0];
+        return this._extension._zones.right[0];
     }
 
     _determineTargetZone(child, originalBoxName) {
@@ -516,18 +561,9 @@ export class ElementRouter {
 
     _reparentToCorrectZone(child, id, order) {
         const index = order.indexOf(id);
-        const total = order.length;
+        const zone = this._getZoneForOrderBucket(index, order.length);
 
-        let zone;
-        if (index < total / 3) {
-            zone = this._extension._zones.left[0];
-        } else if (index < (total / 3) * 2) {
-            zone = this._extension._zones.center[0];
-        } else {
-            zone = this._extension._zones.right[0];
-        }
-
-        if (zone && child && !child.is_finalized?.()) {
+        if (zone && this._isActorAlive(child)) {
             const currentParent = child.get_parent();
             if (currentParent) {
                 currentParent.remove_child(child);
@@ -585,6 +621,88 @@ export class ElementRouter {
         });
     }
 
+    _getOrderIndex(order, itemId) {
+        const index = order.indexOf(itemId);
+        return index === -1 ? 99 : index;
+    }
+
+    _collectPlacementItems(order) {
+        const itemsToPlace = [];
+
+        if (this._isActorAlive(this._extension._taskbar)) {
+            itemsToPlace.push({
+                obj: this._extension._taskbar,
+                id: ID_TASKBAR,
+            });
+        }
+
+        this._extension._originalChildren.forEach((children, boxName) => {
+            for (let i = children.length - 1; i >= 0; i--) {
+                const child = children[i];
+                if (!this._isActorAlive(child)) {
+                    children.splice(i, 1);
+                    continue;
+                }
+
+                if (child === this._extension._masterContainer) continue;
+
+                if (!itemsToPlace.some((item) => item.obj === child)) {
+                    itemsToPlace.push({
+                        obj: child,
+                        id: this._getIdForChild(child, boxName),
+                    });
+                }
+            }
+        });
+
+        itemsToPlace.sort((a, b) => {
+            const indexA = this._getOrderIndex(order, a.id);
+            const indexB = this._getOrderIndex(order, b.id);
+            if (indexA !== indexB) return indexA - indexB;
+
+            const hintA = this._positionHints.get(a.obj);
+            const hintB = this._positionHints.get(b.obj);
+            if (hintA !== undefined && hintB !== undefined)
+                return hintA - hintB;
+            return 0;
+        });
+
+        return itemsToPlace;
+    }
+
+    _applyPlacementItem(item, order) {
+        const index = order.indexOf(item.id);
+        const targetZone = this._zoneForIndex(index);
+        const isValidZone = this._isZoneAlive(targetZone);
+        const isValidObj = this._isActorAlive(item.obj);
+
+        if (!isValidZone || !isValidObj) return;
+
+        try {
+            item.obj.x_expand = false;
+            item.obj.y_expand = true;
+            item.obj.y_align = Clutter.ActorAlign.FILL;
+            item.obj.x_align = this._getHorizontalAlignForOrderIndex(index);
+
+            const currentParent = item.obj.get_parent();
+            if (currentParent) currentParent.remove_child(item.obj);
+            targetZone.add_child(item.obj);
+
+            if (item.id === ID_ACTIVITIES) {
+                const showBtn = this._extension._settings.get_boolean(
+                    "show-activities-button",
+                );
+                showBtn ? item.obj.show() : item.obj.hide();
+            } else if (item.obj._panelModifierForceHidden) {
+                item.obj.hide();
+            } else {
+                item.obj.show();
+            }
+        } catch (e) {
+            // Ignore item reordering failures during a layout refresh.
+        }
+    }
+
     _doRefreshLayout() {
         if (!this._extension._settings || !this._extension._masterContainer)
             return;
@@ -602,36 +720,12 @@ export class ElementRouter {
 
         ["left", "center", "right"].forEach((s) => {
             this._extension._zones[s].forEach((zone) => {
-                let isValidZone = true;
-                try {
-                    if (
-                        !zone ||
-                        (typeof zone.is_finalized === "function" &&
-                            zone.is_finalized())
-                    )
-                        isValidZone = false;
-                } catch (e) {
-                    isValidZone = false;
-                }
-                if (!isValidZone) return;
+                if (!this._isZoneAlive(zone)) return;
 
                 const children = [...zone.get_children()];
                 children.forEach((c) => {
                     try {
-                        let isValid = true;
-                        try {
-                            if (
-                                !c ||
-                                c._panelModifierIsDestroyed ||
-                                (typeof c.is_finalized === "function" &&
-                                    c.is_finalized())
-                            )
-                                isValid = false;
-                        } catch (e) {
-                            isValid = false;
-                        }
-
-                        if (isValid) zone.remove_child(c);
+                        if (this._isActorAlive(c)) zone.remove_child(c);
                     } catch (e) {
                         // Ignore failed child cleanup during a refresh.
                     }
@@ -639,138 +733,8 @@ export class ElementRouter {
             });
         });
 
-        let itemsToPlace = [];
-
-        let isTaskbarValid = true;
-        try {
-            if (
-                !this._extension._taskbar ||
-                (typeof this._extension._taskbar.is_finalized === "function" &&
-                    this._extension._taskbar.is_finalized())
-            ) {
-                isTaskbarValid = false;
-            }
-        } catch (e) {
-            isTaskbarValid = false;
-        }
-
-        if (isTaskbarValid) {
-            itemsToPlace.push({
-                obj: this._extension._taskbar,
-                id: ID_TASKBAR,
-            });
-        }
-
-        this._extension._originalChildren.forEach((children, boxName) => {
-            // Фільтруємо масив з кінця, щоб безпечно видаляти мертві об'єкти
-            for (let i = children.length - 1; i >= 0; i--) {
-                const child = children[i];
-                let isValid = true;
-                try {
-                    if (
-                        !child ||
-                        child._panelModifierIsDestroyed ||
-                        (typeof child.is_finalized === "function" &&
-                            child.is_finalized())
-                    ) {
-                        isValid = false;
-                    }
-                } catch (e) {
-                    isValid = false;
-                }
-
-                if (!isValid) {
-                    children.splice(i, 1);
-                    continue;
-                }
-
-                if (child !== this._extension._masterContainer) {
-                    if (!itemsToPlace.some((item) => item.obj === child)) {
-                        const id = this._getIdForChild(child, boxName);
-                        itemsToPlace.push({ obj: child, id: id });
-                    }
-                }
-            }
-        });
-
-        itemsToPlace.sort((a, b) => {
-            let indexA = order.indexOf(a.id);
-            let indexB = order.indexOf(b.id);
-            if (indexA === -1) indexA = 99;
-            if (indexB === -1) indexB = 99;
-            if (indexA !== indexB) return indexA - indexB;
-
-            const hintA = this._positionHints.get(a.obj);
-            const hintB = this._positionHints.get(b.obj);
-            if (hintA !== undefined && hintB !== undefined)
-                return hintA - hintB;
-            return 0;
-        });
-
-        itemsToPlace.forEach((item) => {
-            const index = order.indexOf(item.id);
-            const targetZone = this._zoneForIndex(index);
-
-            let isValidZone = true;
-            try {
-                if (
-                    !targetZone ||
-                    (typeof targetZone.is_finalized === "function" &&
-                        targetZone.is_finalized())
-                )
-                    isValidZone = false;
-            } catch (e) {
-                isValidZone = false;
-            }
-
-            let isValidObj = true;
-            try {
-                if (
-                    !item.obj ||
-                    item.obj._panelModifierIsDestroyed ||
-                    (typeof item.obj.is_finalized === "function" &&
-                        item.obj.is_finalized())
-                )
-                    isValidObj = false;
-            } catch (e) {
-                isValidObj = false;
-            }
-
-            if (isValidZone && isValidObj) {
-                try {
-                    item.obj.x_expand = false;
-                    item.obj.y_expand = true;
-                    item.obj.y_align = Clutter.ActorAlign.FILL;
-
-                    if (index >= 0 && index < 3) {
-                        item.obj.x_align = Clutter.ActorAlign.START;
-                    } else if (index >= 3 && index < 6) {
-                        item.obj.x_align = Clutter.ActorAlign.CENTER;
-                    } else {
-                        item.obj.x_align = Clutter.ActorAlign.END;
-                    }
-
-                    const currentParent = item.obj.get_parent();
-                    if (currentParent) {
-                        currentParent.remove_child(item.obj);
-                    }
-                    targetZone.add_child(item.obj);
-
-                    if (item.id === ID_ACTIVITIES) {
-                        const showBtn = this._extension._settings.get_boolean(
-                            "show-activities-button",
-                        );
-                        showBtn ? item.obj.show() : item.obj.hide();
-                    } else if (item.obj._panelModifierForceHidden) {
-                        item.obj.hide();
-                    } else {
-                        item.obj.show();
-                    }
-                } catch (e) {
-                    // Ignore item reordering failures during a layout refresh.
-                }
-            }
-        });
+        const itemsToPlace = this._collectPlacementItems(order);
+        itemsToPlace.forEach((item) => this._applyPlacementItem(item, order));
 
         if (this._extension._layoutManager?._applyPanelWidth)
             this._extension._layoutManager._applyPanelWidth();

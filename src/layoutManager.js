@@ -203,17 +203,43 @@ export class LayoutManager {
         this._applyPanelWidth();
     }
 
-    _applyPanelWidth() {
-        if (
-            !this._extension._masterContainer ||
-            !this._extension._settings ||
-            !Main.panel
-        )
-            return;
+    _getSectionLayoutParams(section, isDynamic, taskbarPos) {
+        const params = { yExpand: true };
 
-        // ── LAYOUT BATCHING ──────────────────────────────────────────────────────
-        // Фаза читання: збираємо ВСІ значення з GSettings та обчислюємо геометрію
-        // до першої мутації Clutter-акторів.
+        if (isDynamic) {
+            params.xExpand = false;
+            params.xAlign =
+                section === "left"
+                    ? Clutter.ActorAlign.START
+                    : section === "center"
+                      ? Clutter.ActorAlign.CENTER
+                      : Clutter.ActorAlign.END;
+            return params;
+        }
+
+        const layouts = {
+            left: {
+                left: { xExpand: false, xAlign: Clutter.ActorAlign.START },
+                center: { xExpand: false, xAlign: Clutter.ActorAlign.START },
+                right: { xExpand: true, xAlign: Clutter.ActorAlign.END },
+            },
+            right: {
+                left: { xExpand: true, xAlign: Clutter.ActorAlign.START },
+                center: { xExpand: false, xAlign: Clutter.ActorAlign.END },
+                right: { xExpand: false, xAlign: Clutter.ActorAlign.END },
+            },
+            center: {
+                left: { xExpand: true, xAlign: Clutter.ActorAlign.START },
+                center: { xExpand: false, xAlign: Clutter.ActorAlign.CENTER },
+                right: { xExpand: true, xAlign: Clutter.ActorAlign.END },
+            },
+        };
+
+        const layout = layouts[taskbarPos] || layouts.center;
+        return { ...params, ...(layout[section] || layout.center) };
+    }
+
+    _readPanelLayoutState() {
         const s = this._extension._settings;
 
         const getNum = (key) => {
@@ -230,24 +256,32 @@ export class LayoutManager {
         const widthPct = getNum("panel-width") || 100;
 
         const monitor =
-            Main.layoutManager.primaryMonitor ||
-            Main.layoutManager.focusMonitor;
+            Main.layoutManager.primaryMonitor || Main.layoutManager.focusMonitor;
         const monitorWidth = monitor ? monitor.width : global.stage.width;
 
-        const h = getNum("panel-height") || 32;
-        const mt = getNum("margin-top");
-        const mb = getNum("margin-bottom");
-        const ml = getNum("margin-left");
-        const mr = getNum("margin-right");
-        const rtl = getNum("border-radius-top-left");
-        const rtr = getNum("border-radius-top-right");
-        const rbl = getNum("border-radius-bottom-left");
-        const rbr = getNum("border-radius-bottom-right");
+        return {
+            s,
+            getNum,
+            isDynamic,
+            taskbarPos,
+            widthPct,
+            monitorWidth,
+            h: getNum("panel-height") || 32,
+            mt: getNum("margin-top"),
+            mb: getNum("margin-bottom"),
+            ml: getNum("margin-left"),
+            mr: getNum("margin-right"),
+            rtl: getNum("border-radius-top-left"),
+            rtr: getNum("border-radius-top-right"),
+            rbl: getNum("border-radius-bottom-left"),
+            rbr: getNum("border-radius-bottom-right"),
+        };
+    }
 
-        const totalH = h + mt + mb;
+    _buildMasterContainerStyle(layoutState) {
+        const { h, mt, mb, ml, mr, rtl, rtr, rbl, rbr, isDynamic, widthPct, monitorWidth } = layoutState;
         const horizontalPadding = 10;
 
-        // Будуємо рядок стилю повністю в пам'яті — без доступу до акторів
         let styleStr =
             `height:${h}px;` +
             `margin-top:${mt}px;` +
@@ -257,75 +291,52 @@ export class LayoutManager {
             `border-radius:${rtl}px ${rtr}px ${rbr}px ${rbl}px;` +
             `padding: 0px ${horizontalPadding / 2}px;`;
 
-        // Розраховуємо ширину до запису
         let containerXExpand = false;
-        let containerXAlign = Clutter.ActorAlign.CENTER;
-
-        if (isDynamic) {
-            // Let St use the actor's natural width in dynamic mode.
-        } else {
-            const availW = Math.max(
-                0,
-                monitorWidth - ml - mr - horizontalPadding,
-            );
+        if (!isDynamic) {
+            const availW = Math.max(0, monitorWidth - ml - mr - horizontalPadding);
             const calcW = Math.floor((availW * widthPct) / 100);
             containerXExpand = true;
             styleStr += `width:${calcW}px;`;
         }
 
+        return { styleStr, containerXExpand, containerXAlign: Clutter.ActorAlign.CENTER };
+    }
+
+    _applyPanelWidth() {
+        if (
+            !this._extension._masterContainer ||
+            !this._extension._settings ||
+            !Main.panel
+        )
+            return;
+
+        // ── LAYOUT BATCHING ──────────────────────────────────────────────────────
+        // Фаза читання: збираємо ВСІ значення з GSettings та обчислюємо геометрію
+        // до першої мутації Clutter-акторів.
+        const layoutState = this._readPanelLayoutState();
+        const {
+            h,
+            mt,
+            mb,
+            isDynamic,
+            taskbarPos,
+            totalH,
+        } = {
+            ...layoutState,
+            totalH: layoutState.h + layoutState.mt + layoutState.mb,
+        };
+
+        const { styleStr, containerXExpand, containerXAlign } =
+            this._buildMasterContainerStyle(layoutState);
+
         // Обчислюємо параметри секцій — теж до запису
         const sectionParams = {};
-        ["left", "center", "right"].forEach((s) => {
-            const params = { yExpand: true };
-            if (isDynamic) {
-                params.xExpand = false;
-                params.xAlign =
-                    s === "left"
-                        ? Clutter.ActorAlign.START
-                        : s === "center"
-                          ? Clutter.ActorAlign.CENTER
-                          : Clutter.ActorAlign.END;
-            } else if (taskbarPos === "left") {
-                if (s === "left") {
-                    params.xExpand = false;
-                    params.xAlign = Clutter.ActorAlign.START;
-                }
-                if (s === "center") {
-                    params.xExpand = false;
-                    params.xAlign = Clutter.ActorAlign.START;
-                }
-                if (s === "right") {
-                    params.xExpand = true;
-                    params.xAlign = Clutter.ActorAlign.END;
-                }
-            } else if (taskbarPos === "right") {
-                if (s === "left") {
-                    params.xExpand = true;
-                    params.xAlign = Clutter.ActorAlign.START;
-                }
-                if (s === "center") {
-                    params.xExpand = false;
-                    params.xAlign = Clutter.ActorAlign.END;
-                }
-                if (s === "right") {
-                    params.xExpand = false;
-                    params.xAlign = Clutter.ActorAlign.END;
-                }
-            } else {
-                if (s === "left") {
-                    params.xExpand = true;
-                    params.xAlign = Clutter.ActorAlign.START;
-                }
-                if (s === "center") {
-                    params.xExpand = false;
-                    params.xAlign = Clutter.ActorAlign.CENTER;
-                }
-                if (s === "right") {
-                    params.xExpand = true;
-                    params.xAlign = Clutter.ActorAlign.END;
-                }
-            }
-            sectionParams[s] = params;
+        ["left", "center", "right"].forEach((section) => {
+            sectionParams[section] = this._getSectionLayoutParams(
+                section,
+                isDynamic,
+                taskbarPos,
+            );
         });
 
         // ── ФАЗА ЗАПИСУ (всі мутації Clutter в одному блоці) ────────────────────
