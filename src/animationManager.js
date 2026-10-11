@@ -400,12 +400,35 @@ class TransitionScheduler {
  */
 export class AnimationManager {
     /** @deprecated лишається для сумісності — делегує в ProfileRegistry */
-    static getAnimation(animIdentifier, settings = null, namespace = null) {
+
+    /**
+     * Отримати параметри профілю анімації без запуску переходу.
+     *
+     * Використовувати, коли модуль сам керує переходом
+     * через actor.ease() і потребує параметрів профілю.
+     *
+     * Для переходів, які повністю контролює менеджер,
+     * використовувати AnimationManager.run().
+     *
+     * @param {string|number} animIdentifier
+     * @param {Gio.Settings|null} [settings=null]
+     * @param {string|null} [namespace=null]
+     * @returns {{showMode:number, hideMode:number, showDur:number, hideDur:number}}
+     */
+    static getAnimationData(animIdentifier, settings = null, namespace = null) {
         return ProfileRegistry.getAnimation(
             animIdentifier,
             settings,
             namespace,
         );
+    }
+
+    /**
+     * @deprecated Use getAnimationData() to read profile data,
+     * or run() to execute a transition.
+     */
+    static getAnimation(animIdentifier, settings = null, namespace = null) {
+        return this.getAnimationData(animIdentifier, settings, namespace);
     }
 
     /**
@@ -421,6 +444,7 @@ export class AnimationManager {
      *       settings, namespace: 'tooltip', phase: 'show'
      *   });
      */
+
     static run(
         actor,
         props,
@@ -429,12 +453,21 @@ export class AnimationManager {
             settings = null,
             namespace = null,
             phase = "show",
+            duration: durationOverride = null,
         } = {},
     ) {
         const anim = ProfileRegistry.getAnimation(animId, settings, namespace);
+
         const mode = phase === "show" ? anim.showMode : anim.hideMode;
-        const duration = phase === "show" ? anim.showDur : anim.hideDur;
-        return TransitionEngine.run(actor, props, { mode, duration });
+
+        const duration =
+            durationOverride ??
+            (phase === "show" ? anim.showDur : anim.hideDur);
+
+        return TransitionEngine.run(actor, props, {
+            mode,
+            duration,
+        });
     }
 
     /** Скасувати активні переходи на акторі (наприклад, у disable() чи при швидкій зміні стану) */

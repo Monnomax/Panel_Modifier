@@ -47,7 +47,7 @@ export class WindowPreview {
 
     _getAnimationData(isHide) {
         const animType = this._settings?.get_int("preview-animation") ?? 3; // 3 = Ease Out Cubic
-        const animData = AnimationManager.getAnimation(
+        const animData = AnimationManager.getAnimationData(
             animType,
             this._settings,
             "preview",

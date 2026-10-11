@@ -56,7 +56,7 @@ export class Tooltip {
 
     _getAnimationData(isHide) {
         const animType = this._settings?.get_int("tooltip-animation") ?? 6; // 6 = Ease Out Quad
-        const animData = AnimationManager.getAnimation(animType, this._settings, 'tooltip');
+        const animData = AnimationManager.getAnimationData(animType, this._settings, 'tooltip');
 
         const speed = isHide
             ? this._settings?.get_int("tooltip-hide-speed") ?? 300

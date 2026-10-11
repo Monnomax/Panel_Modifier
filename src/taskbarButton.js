@@ -129,12 +129,12 @@ export class TaskbarButtonManager {
             const pressAnimIndex = this._settings.get_int(
                 "icon-press-animation",
             );
-            const hoverAnimData = AnimationManager.getAnimation(
+            const hoverAnimData = AnimationManager.getAnimationData(
                 hoverAnimIndex,
                 this._settings,
                 "icon",
             );
-            const pressAnimData = AnimationManager.getAnimation(
+            const pressAnimData = AnimationManager.getAnimationData(
                 pressAnimIndex,
                 this._settings,
                 "icon",

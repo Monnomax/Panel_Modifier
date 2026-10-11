@@ -29,7 +29,6 @@ export class AutoHideManager {
         this._showThreshold = 5;
         this._showDelay = 150;
 
-        // Початкове значення анімації за замовчуванням
         this._currentAnimationData = Clutter.AnimationMode.EASE_OUT_QUAD;
     }
 
@@ -174,7 +173,6 @@ export class AutoHideManager {
     disable() {
         this._autohideEnabled = false;
 
-        // --- 1. ТАЙМЕРИ ---
         if (this._showTimeoutId) {
             GLib.source_remove(this._showTimeoutId);
             this._showTimeoutId = null;
@@ -192,7 +190,6 @@ export class AutoHideManager {
 
         this._clearHideTimeout();
 
-        // --- 2. SIGNALS ---
         if (this._signals && this._signals.length > 0) {
             this._signals.forEach((sig) => {
                 if (sig.obj && sig.id && sig.obj.disconnect) {
@@ -206,13 +203,11 @@ export class AutoHideManager {
             this._signals = [];
         }
 
-        // --- 3. POINTER WATCHER ---
         if (this._pointerWatch) {
             this._pointerWatch.remove();
             this._pointerWatch = null;
         }
 
-        // --- 4. PANEL VISUAL & CHROME RESET ---
         const panelBox = Main.layoutManager.panelBox;
         if (panelBox) {
             try {
@@ -233,12 +228,11 @@ export class AutoHideManager {
             } catch (e) {}
         }
 
-        // --- 5. INTERNAL STATE RESET ---
         this._panelVisible = true;
     }
 
     _getAnimationData(animName) {
-        return AnimationManager.getAnimation(animName, this._settings);
+        return AnimationManager.getAnimationData(animName, this._settings);
     }
 
     _loadSettings() {
@@ -402,13 +396,6 @@ export class AutoHideManager {
             [width] = panelBox.get_transformed_size();
         }
 
-        // ВАЖЛИВО: showThreshold — це поріг для виявлення курсора БІЛЯ КРАЮ
-        // МОНІТОРА (по Y), а не буфер навколо самої панелі по X. Якщо
-        // застосувати його і по горизонталі, зона реакції "розповзається"
-        // у вільний простір збоку від панелі (Dynamic Panel Width / width < 100%),
-        // і панель помилково вважає курсор "над собою", коли він насправді
-        // перебуває поза її фактичними межами. Тому по X використовуємо лише
-        // мінімальний технічний допуск (округлення координат), а не showThreshold.
         const marginX = 1;
         const marginY = this._showThreshold || 5;
 
@@ -427,10 +414,10 @@ export class AutoHideManager {
                 const [pW, pH] = previewContainer.get_transformed_size();
 
                 const overPreview =
-                    x >= pX - margin &&
-                    x <= pX + pW + margin &&
-                    y >= pY - margin &&
-                    y <= pY + pH + margin;
+                    x >= pX - marginX &&
+                    x <= pX + pW + marginX &&
+                    y >= pY - marginY &&
+                    y <= pY + pH + marginY;
 
                 if (overPreview) return true;
             }
@@ -671,12 +658,6 @@ export class AutoHideManager {
 
         if (!monitor) return false;
 
-        // Реальна ширина панелі по X. Якщо панель вужча за монітор
-        // (Dynamic Panel Width або panel-width < 100%), беремо фактичні
-        // межі masterContainer, а не всю ширину монітора — інакше вікно,
-        // що лежить лише під "вільним простором" збоку від панелі,
-        // помилково вважається таким, що перекриває панель, і інтелектуальне
-        // автоприховування ніколи не ховає панель.
         let pX, pW;
         if (this._extension && this._extension._masterContainer) {
             [pX] = this._extension._masterContainer.get_transformed_position();
