@@ -1,8 +1,5 @@
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
-import {
-    Extension,
-    gettext as _,
-} from "resource:///org/gnome/shell/extensions/extension.js";
+import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
 import St from "gi://St";
 import Clutter from "gi://Clutter";
 import GLib from "gi://GLib";
@@ -11,6 +8,7 @@ import { LayoutManager } from "./src/layoutManager.js";
 import { ElementRouter } from "./src/elementRouter.js";
 import { SystemUIManager } from "./src/systemUIManager.js";
 import { LifecycleManager } from "./src/lifecycleManager.js";
+import { PanelContextMenu } from "./src/panelContextMenu.js";
 
 const STACKED_TL = "stackedTL";
 const STACKED_BR = "stackedBR";
@@ -48,7 +46,6 @@ function safeDisconnectSignal(signalRecord) {
             message.includes("destroyed");
 
         if (!isExpectedDisposalError) {
-            // Intentionally silent: avoid noisy diagnostics in production.
         }
     }
 }
@@ -62,19 +59,17 @@ export default class PanelLayoutExtension extends Extension {
         this._zones = { left: [], center: [], right: [] };
         this._signals = [];
 
-        // Ініціалізація підключених менеджерів
         this._layoutManager = new LayoutManager(this);
         this._elementRouter = new ElementRouter(this);
         this._systemUIManager = new SystemUIManager(this);
         this._lifecycleManager = new LifecycleManager(this);
 
-        // Виклики методів через відповідний менеджер розмітки
         this._layoutManager._createMasterContainer();
         this._layoutManager._createZones();
 
-        // Перехоплюємо автоперемикання меню при наведенні одразу — це
-        // не залежить від фази запуску Shell і не потребує очікування
-        // startup-complete.
+        this._panelContextMenu = new PanelContextMenu(this);
+        this._panelContextMenu.enable();
+
         this._systemUIManager._patchMenuHoverSwitch();
 
         this._themeContext = St.ThemeContext.get_for_stage(global.stage);
@@ -116,8 +111,6 @@ export default class PanelLayoutExtension extends Extension {
             },
         );
         this._signals.push({ obj: this._settings, id: orderId });
-
-        // Викликаємо один раз при запуску розширення, щоб врахувати збережений стан
     }
 
     disable() {
@@ -131,12 +124,16 @@ export default class PanelLayoutExtension extends Extension {
             this._startupId = null;
         }
 
-        // ── Спочатку відключаємо всі відстежувані сигнали, ПОКИ об'єкти ще живі ──
         if (this._signals && this._signals.length > 0) {
             this._signals.forEach((signalRecord) => {
                 safeDisconnectSignal(signalRecord);
             });
             this._signals = [];
+        }
+
+        if (this._panelContextMenu) {
+            this._panelContextMenu.destroy();
+            this._panelContextMenu = null;
         }
 
         if (this._separators) {
@@ -161,7 +158,6 @@ export default class PanelLayoutExtension extends Extension {
             this._signals = [];
         }
 
-        // Повернення стану через менеджер системного UI та маршрутизатор елементів
         this._systemUIManager._restoreSolidStyle();
         this._systemUIManager._restoreMenuHoverSwitch();
         this._systemUIManager._forceHideIndicator("a11y", false);
