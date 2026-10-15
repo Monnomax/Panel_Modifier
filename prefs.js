@@ -210,6 +210,16 @@ export default class MyPrefs extends ExtensionPreferences {
         });
 
         // --- ГРУПА: ПІДКАЗКИ ТА ПРЕВ'Ю ---
+        const panelTransparencyRow = this._addButtonSliderRow(
+            adaptivePanelGroup,
+            settings,
+            "panel-background-transparency",
+            "Прозорість панелі",
+            0,
+            100,
+            5,
+        );
+
         const tooltipsGroup = new Adw.PreferencesGroup({
             title: "Підказки та прев'ю",
         });

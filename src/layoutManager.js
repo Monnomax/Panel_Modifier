@@ -30,8 +30,8 @@ export class LayoutManager {
         try {
             Main.layoutManager.uiGroup.add_child(probe);
             const themeNode = probe.get_theme_node();
-
             const bg = themeNode.get_background_color();
+
             if (bg && bg.alpha > 0) {
                 color = {
                     red: bg.red,
@@ -44,7 +44,7 @@ export class LayoutManager {
                     typeof themeNode.get_box_shadow === "function"
                         ? themeNode.get_box_shadow()
                         : null;
-                if (shadow && shadow.color && shadow.color.alpha > 0) {
+                if (shadow?.color && shadow.color.alpha > 0) {
                     color = {
                         red: shadow.color.red,
                         green: shadow.color.green,
@@ -80,7 +80,6 @@ export class LayoutManager {
                 settings.get_int("panel-adaptive-color-intensity") || 0,
             ),
         );
-        if (intensity <= 0) return null;
 
         const tracker = Shell.WindowTracker.get_default();
         const focusWindow = global.display.focus_window;
@@ -92,25 +91,58 @@ export class LayoutManager {
             app = runningApps.length > 0 ? runningApps[0] : null;
         }
 
+        // Поки немає запущеної програми, адаптивний колір не застосовуємо:
+        // _composeMasterContainerStyle() тимчасово використає колір теми #panel.
         if (!app) return null;
 
-        const iconColor = getAverageAppIconColor(app);
-        if (!iconColor) return null;
+        const averageColor = getAverageAppIconColor(app);
+        if (!averageColor) return null;
 
-        const base = this._getThemePanelBaseColor();
+        // Пом'якшуємо колір іконки, змішуючи його з білим.
+        // Це знижує насиченість і робить відтінок пастельнішим.
+        const pastelMix = 0.38;
+        const iconColor = {
+            r: Math.round(averageColor.r * (1 - pastelMix) + 255 * pastelMix),
+            g: Math.round(averageColor.g * (1 - pastelMix) + 255 * pastelMix),
+            b: Math.round(averageColor.b * (1 - pastelMix) + 255 * pastelMix),
+        };
+
         const k = intensity / 100;
 
-        const r = Math.round(base.red * (1 - k) + iconColor.r * k);
-        const g = Math.round(base.green * (1 - k) + iconColor.g * k);
-        const b = Math.round(base.blue * (1 - k) + iconColor.b * k);
-        const a = (base.alpha / 255).toFixed(3);
+        // Інтенсивність змінює яскравість кольору іконки,
+        // не змішуючи його з кольором теми оболонки.
+        // Якщо колір іконки недоступний, використовуємо чорний, а не #panel.
+        const r = iconColor ? Math.round(iconColor.r * k) : 0;
+        const g = iconColor ? Math.round(iconColor.g * k) : 0;
+        const b = iconColor ? Math.round(iconColor.b * k) : 0;
+        const transparency = Math.max(
+            0,
+            Math.min(100, settings.get_int("panel-background-transparency")),
+        );
+        const alpha = ((100 - transparency) / 100).toFixed(3);
 
-        return `background-color: rgba(${r}, ${g}, ${b}, ${a});`;
+        return `background-color: rgba(${r}, ${g}, ${b}, ${alpha});`;
     }
 
     _composeMasterContainerStyle(baseStyle) {
-        const overlayStyle = this._getAdaptiveOverlayColor();
-        return overlayStyle ? `${baseStyle}${overlayStyle}` : baseStyle;
+        const settings = this._extension?._settings;
+        if (!settings) return baseStyle;
+
+        if (settings.get_boolean("panel-adaptive-color-enabled")) {
+            const adaptiveStyle = this._getAdaptiveOverlayColor();
+            if (adaptiveStyle) return `${baseStyle}${adaptiveStyle}`;
+        }
+
+        // Адаптивний режим ще не має кольору іконки: використовуємо #panel.
+        const base = this._getThemePanelBaseColor();
+        const transparency = Math.max(
+            0,
+            Math.min(100, settings.get_int("panel-background-transparency")),
+        );
+        // У режимі Off зберігаємо прозорість теми й додаємо прозорість повзунка.
+        const alpha = ((base.alpha / 255) * (100 - transparency) / 100).toFixed(3);
+
+        return `${baseStyle}background-color: rgba(${Math.round(base.red)}, ${Math.round(base.green)}, ${Math.round(base.blue)}, ${alpha});`;
     }
 
     _updatePanelAdaptiveColor() {

@@ -75,6 +75,7 @@ export class LifecycleManager {
             "taskbar-position",
             "panel-adaptive-color-enabled",
             "panel-adaptive-color-intensity",
+            "panel-background-transparency",
             "margin-top",
             "margin-bottom",
             "margin-left",

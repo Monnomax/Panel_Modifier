@@ -35,6 +35,11 @@
             <summary>Інтенсивність адаптивного кольору панелі (0-100)</summary>
         </key>
 
+        <key name="panel-background-transparency" type="i">
+            <default>0</default>
+            <summary>Прозорість панелі (0 — без додаткової прозорості, 100 — повністю прозора)</summary>
+        </key>
+
         <key name="dynamic-panel-width" type="b">
             <default>true</default>
             <summary>Динамічна ширина панелі</summary>
