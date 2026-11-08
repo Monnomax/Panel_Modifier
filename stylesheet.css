@@ -1,0 +1,63 @@
+.panel-taskbar .panel-button {
+  background-color: transparent !important;
+  background-image: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0px !important;
+  overflow: visible;
+}
+
+.taskbar-placeholder {
+  margin: 0px !important;
+}
+
+.preview-container {
+    border-radius: 15px !important;
+    padding: 10px !important;
+}
+
+.window-preview-container {
+    border-radius: 10px !important;
+    padding: 10px !important;
+    spacing: 5px;
+}
+
+.preview-header {
+    padding: 5px 5px;
+    spacing: 10px;
+}
+
+.preview-header-icon {
+    margin-right: 2px;
+}
+
+.preview-title {
+    font-size: 10pt;
+    max-width: 170px; 
+}
+
+.preview-title > ClutterText {
+    st-gray-scale: 0px;
+}
+
+.preview-close-button {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 3px;
+   transition-duration: 200ms;
+}
+
+.preview-close-button:hover {
+    background-color: rgba(209, 49, 56, 1);
+    color: white;
+}
+
+.preview-clone-frame {
+    margin: 5px 6px 6px 6px;
+    border-radius: 4px;
+}
+
+.tooltip {
+    border-radius: 10px !important;
+    padding: 10px 15px !important;
+}

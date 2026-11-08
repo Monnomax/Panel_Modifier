@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Panel Modifier Download Progress",
+  "version": "0.1.0",
+  "description": "Reports active download progress to the GNOME Panel Modifier extension.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "panel-modifier-download-progress@monnomax.local",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": [
+          "websiteActivity"
+        ]
+      }
+    }
+  },
+  "permissions": [
+    "downloads",
+    "nativeMessaging"
+  ],
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  }
+}

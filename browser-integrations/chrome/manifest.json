@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Panel Modifier Download Progress",
+  "version": "0.1.0",
+  "description": "Reports active download progress to the GNOME Panel Modifier extension.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1JM0xzP08iHdkilVJEYmjTXUa12O02GoVx8cWynCdaQbNlGTP+eEOIQMzXLPNy7Gf9Mt42gVfyPyms/cSreWEzEhNXBfMxzOY0doMfwM5xFpaDH0mGtWT/3PSqRXW5AqRIztUtjdPyx6P9XjcGzTeN5GvtsWTUPA5Jz/fNQWgxaAasP/vWWA4D+p2/IY1BjV3hjLUXTB6mUXikXG329FAlsvOD+TPJWVrQD3XbIzbm3ybWn229o/9NeHEEDcshW2lVk6kGn8K5UQ+5fNISW2/mb6/qZ9FHUre4xsogi10qHQJ1OfHnzU11MsrwqY39kObvCrUnWTlg/68cDWrkwk2QIDAQAB",
+  "permissions": [
+    "downloads",
+    "nativeMessaging"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}
