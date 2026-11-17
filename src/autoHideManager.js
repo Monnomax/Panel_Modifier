@@ -524,7 +524,7 @@ export class AutoHideManager {
 
         this._overviewExitTimeoutId = GLib.timeout_add(
             GLib.PRIORITY_DEFAULT,
-            100,
+            200,
             () => {
                 if (
                     Main.overview.visible ||
