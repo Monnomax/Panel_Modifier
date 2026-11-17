@@ -41,12 +41,8 @@ export class WindowPreview {
         this._destroyId = this._actor.connect("destroy", () => this.destroy());
     }
 
-    // =====================================================
-    // Animation
-    // =====================================================
-
     _getAnimationData(isHide) {
-        const animType = this._settings?.get_int("preview-animation") ?? 3; // 3 = Ease Out Cubic
+        const animType = this._settings?.get_int("preview-animation") ?? 3;
         const animData = AnimationManager.getAnimationData(
             animType,
             this._settings,
@@ -62,10 +58,6 @@ export class WindowPreview {
             duration: speed,
         };
     }
-
-    // =====================================================
-    // Events
-    // =====================================================
 
     _onEnter() {
         if (this._destroyed) return;
@@ -130,10 +122,6 @@ export class WindowPreview {
         this._tooltip?._hideAnimated();
     }
 
-    // =====================================================
-    // Timers
-    // =====================================================
-
     _clearTimers() {
         this._clearShowTimer();
         this._clearHideTimer();
@@ -173,10 +161,6 @@ export class WindowPreview {
         );
     }
 
-    // =====================================================
-    // Show / Hide
-    // =====================================================
-
     _show() {
         if (this._destroyed) return;
 
@@ -186,7 +170,6 @@ export class WindowPreview {
 
         if (windows.length === 0) return;
 
-        // Фільтруємо лише вікна з валідним актором
         const validWindows = windows.filter(
             (w) => w.get_compositor_private() !== null,
         );
@@ -197,10 +180,8 @@ export class WindowPreview {
         const baseSizeGroup =
             this._settings?.get_int("preview-base-size-group") ?? 180;
 
-        // При кількох вікнах використовуємо групове налаштування
         const maxWidth = validWindows.length > 1 ? baseSizeGroup : baseSize;
 
-        // Зовнішній контейнер — горизонтальний, містить усі картки
         this._container = new St.BoxLayout({
             style_class: "dash-label window-preview-container",
             vertical: false,
@@ -216,7 +197,6 @@ export class WindowPreview {
 
         this._container.set_pivot_point(0.5, 0.5);
 
-        // Перевіряємо, чи курсор дійсно зайшов у контейнер ззовні
         this._containerEnterId = this._container.connect(
             "enter-event",
             (actor, event) => {
@@ -231,7 +211,6 @@ export class WindowPreview {
             },
         );
 
-        // Перевіряємо, чи курсор дійсно покинув межі всього контейнера, а не перейшов на інший внутрішній елемент
         this._containerLeaveId = this._container.connect(
             "leave-event",
             (actor, event) => {
@@ -246,18 +225,15 @@ export class WindowPreview {
             },
         );
 
-        // Будуємо картку для кожного вікна
         for (const window of validWindows) {
             const windowActor = window.get_compositor_private();
 
-            // Картка — вертикальний бокс: хедер + клон
             const card = new St.BoxLayout({
                 style_class: "preview-window-card",
                 vertical: true,
                 reactive: true,
             });
 
-            // ── Хедер ──────────────────────────────────
             const header = new St.BoxLayout({
                 style_class: "preview-header",
                 vertical: false,
@@ -294,7 +270,6 @@ export class WindowPreview {
 
             closeBtn.connect("clicked", () => {
                 window.delete(global.get_current_time());
-                // Якщо це останнє вікно — ховаємо весь попап
                 if (this._app?.get_windows().length <= 1) this._hideAnimated();
                 else card.destroy();
             });
@@ -305,7 +280,6 @@ export class WindowPreview {
 
             card.add_child(header);
 
-            // ── Область прев'ю (анімується) ─────────────
             const rect = window.get_frame_rect();
             const scale = maxWidth / rect.width;
 
@@ -342,18 +316,15 @@ export class WindowPreview {
             previewFrame.connect("notify::width", () => card.queue_relayout());
             previewFrame.connect("notify::height", () => card.queue_relayout());
 
-            // Використовуємо captured-event, щоб Clutter не ігнорував середню кнопку
             cloneBtn.connect("captured-event", (actor, event) => {
                 if (event.type() === Clutter.EventType.BUTTON_RELEASE) {
                     const button = event.get_button();
 
                     if (button === Clutter.BUTTON_PRIMARY) {
-                        // Ліва кнопка — фокусуємо вікно
                         Main.activateWindow(window);
                         this._hideAnimated();
                         return Clutter.EVENT_STOP;
                     } else if (button === Clutter.BUTTON_MIDDLE) {
-                        // Середня кнопка — закриваємо вікно
                         window.delete(global.get_current_time());
                         if (this._app?.get_windows().length <= 1)
                             this._hideAnimated();
@@ -373,11 +344,9 @@ export class WindowPreview {
 
         this._updatePosition();
 
-        // Зберігаємо базові розміри контейнера для коректного центрування при масштабуванні
         this._container._baseWidth = this._container.get_width();
         this._container._baseHeight = this._container.get_height();
 
-        // Зберігаємо посилання на поточний активний контейнер для AutoHideManager
         WindowPreview.activeContainer = this._container;
 
         const anim = this._getAnimationData(false);
@@ -439,10 +408,6 @@ export class WindowPreview {
         this._container = null;
     }
 
-    // =====================================================
-    // Position
-    // =====================================================
-
     _updatePosition() {
         if (!this._container?.get_stage()) return;
 
@@ -478,10 +443,6 @@ export class WindowPreview {
             Math.floor(previewY),
         );
     }
-
-    // =====================================================
-    // Cleanup
-    // =====================================================
 
     destroy() {
         if (this._destroyed) return;

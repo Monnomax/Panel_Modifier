@@ -38,25 +38,10 @@ function safeDisconnectSignal(obj, id) {
             message.includes("destroyed");
 
         if (!isExpectedDisposalError) {
-            // Ignore unexpected disposal errors silently.
         }
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// Taskbar (TaskBarViewport) — фіксований за шириною "візок", що обрізає
-// TaskbarContent (clip_to_allocation) і плавно зміщує його всередині себе
-// залежно від горизонтальної позиції курсора (sigmoid-мапінг).
-//
-// Архітектура:
-//   Taskbar (viewport, clip_to_allocation, ширина = GeometryManager)
-//     └── TaskbarContent (природна ширина = сума ширин іконок)
-//
-// Уся геометрія (ширина viewport/content, maxOffset, offset)
-// обчислюється виключно через TaskbarGeometryManager.measure() — сам клас
-// Taskbar лише читає/пише готові значення та надає GeometryManager-у
-// "сирі" виміри сусідніх елементів панелі.
-// ═══════════════════════════════════════════════════════════════════════
 const Taskbar = GObject.registerClass(
     class Taskbar extends St.Widget {
         _init(extension, settings) {
@@ -91,9 +76,7 @@ const Taskbar = GObject.registerClass(
                 this._fadeEffect = new TaskbarFadeEffect();
                 this._fadeEffect.set_enabled(false);
                 this.add_effect(this._fadeEffect);
-            } catch (e) {
-                // Ignore shader setup failures and keep the taskbar functional.
-            }
+            } catch (e) {}
 
             this._signals = [];
             this._hookGeometrySignals();
@@ -102,8 +85,6 @@ const Taskbar = GObject.registerClass(
 
             this.connect("destroy", this._onDestroy.bind(this));
 
-            // Відкладаємо перший вимір, щоб панель встигла отримати
-            // реальну геометрію під час старту.
             this._initialMeasureId = GLib.idle_add(
                 GLib.PRIORITY_DEFAULT,
                 () => {
@@ -118,7 +99,6 @@ const Taskbar = GObject.registerClass(
             );
         }
 
-        // ── Підписки на все, що може вплинути на геометрію ──────────────
         _hookGeometrySignals() {
             const track = (obj, sig, cb) => {
                 if (!obj || typeof obj.connect !== "function") return;
@@ -130,17 +110,10 @@ const Taskbar = GObject.registerClass(
                 if (this._geometry) this._geometry.scheduleMeasure();
             };
 
-            // Зміна кількості/ширини іконок таскбару.
             track(this._content, "notify::width", scheduleMeasure);
 
-            // Зміна монітора / масштабування.
             track(Main.layoutManager, "monitors-changed", scheduleMeasure);
 
-            // Зміна ширини всього masterContainer — найнадійніший
-            // "catch-all" тригер: спрацьовує при появі/зникненні кнопок
-            // розширень, зміні ширини годинника, Quick Settings, зміні
-            // Dynamic Panel Width тощо, бо всі вони — нащадки цього
-            // контейнера.
             if (this._extension && this._extension._masterContainer) {
                 track(
                     this._extension._masterContainer,
@@ -150,9 +123,6 @@ const Taskbar = GObject.registerClass(
             }
         }
 
-        // ── "Сирі" виміри для TaskbarGeometryManager ────────────────────
-        // Сума натуральних ширин усіх видимих елементів панелі, окрім
-        // самого таскбару (width(left widgets) + width(right widgets)).
         _measureOtherElementsWidth() {
             const ext = this._extension;
             if (!ext || !ext._zones) return 0;
@@ -194,21 +164,11 @@ const Taskbar = GObject.registerClass(
 
             const ml = s.get_int("margin-left") || 0;
             const mr = s.get_int("margin-right") || 0;
-            // Той самий внутрішній padding, що встановлює
-            // LayoutManager._applyPanelWidth() на Main.panel.
             const horizontalPadding = PANEL_HORIZONTAL_PADDING;
 
             return ml + mr + horizontalPadding;
         }
 
-        // Повертає "стелю" ширини, у межах якої дозволено розташовувати
-        // елементи панелі (включно з таскбаром):
-        //   - Dynamic Panel Width: стеля = ширина монітора (margins/padding
-        //     віднімаються окремо в measure(), бо панель сама не обмежує).
-        //   - Фіксована ширина (panel-width%): стеля = фактична ширина
-        //     панелі, яку встановлює LayoutManager._applyPanelWidth()
-        //     (той самий розрахунок calcW), вона вже враховує
-        //     margins/padding і завжди <= ширини монітора.
         _measurePanelWidthBasis(monitorWidth) {
             const s = this._settings;
             if (!s) return { basis: monitorWidth, marginsIncluded: false };
@@ -229,11 +189,9 @@ const Taskbar = GObject.registerClass(
             );
             const calcW = Math.floor((availW * widthPct) / 100);
 
-            // calcW вже включає віднімання margins/padding — не віднімати їх ще раз.
             return { basis: calcW, marginsIncluded: true };
         }
 
-        // ── Застосування результатів measure() до реальних акторів ──────
         _applyGeometry() {
             const g = this._geometry;
             if (!g) return;
@@ -258,13 +216,6 @@ const Taskbar = GObject.registerClass(
 
             if (!g || !effect) return;
 
-            /*
-             * Якщо content прокручений вправо від початкової позиції,
-             * зліва вже є прихований контент.
-             *
-             * Якщо ще не дійшли до правого краю,
-             * справа теж є прихований контент.
-             */
             const epsilon = 0.5;
 
             const leftFade = g.currentOffset > epsilon;
@@ -274,7 +225,6 @@ const Taskbar = GObject.registerClass(
             effect.setFade(leftFade, rightFade, 48);
         }
 
-        // ── Керування курсором ───────────────────────────────────────────
         _onMotion(actor, event) {
             const g = this._geometry;
             if (!g || !g.scrollingEnabled) return Clutter.EVENT_PROPAGATE;
@@ -292,7 +242,6 @@ const Taskbar = GObject.registerClass(
             return Clutter.EVENT_PROPAGATE;
         }
 
-        // ── Проксі публічних методів, якими користуються інші менеджери ─
         _redisplay(...args) {
             this._content._redisplay(...args);
             if (this._geometry) this._geometry.scheduleMeasure();
@@ -307,7 +256,6 @@ const Taskbar = GObject.registerClass(
         }
 
         _onDestroy() {
-            // Скасовуємо відкладений початковий вимір viewport.
             if (this._initialMeasureId) {
                 GLib.source_remove(this._initialMeasureId);
                 this._initialMeasureId = 0;

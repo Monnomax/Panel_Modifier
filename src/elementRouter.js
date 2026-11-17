@@ -2,9 +2,6 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import Clutter from "gi://Clutter";
 import GLib from "gi://GLib";
 
-// Логічні ID елементів панелі — саме ці рядки зберігаються у GSettings
-// ("panel-element-order") і саме на них посилається вкладка "Порядок
-// елементів" у вікні налаштувань.
 const ID_ACTIVITIES = "activities";
 const ID_TASKBAR = "taskbar";
 const ID_LEFT_EXT = "left_extensions";
@@ -27,28 +24,14 @@ const DEFAULT_ORDER = [
     ID_DATE_MENU,
 ];
 
-// Три стандартні бокси, з яких складається панель GNOME Shell.
-// Це структурний факт про будову панелі (не спосіб розпізнавання
-// елементів), тож використовується лише для обходу/перехоплення самих
-// боксів, а не для визначення "хто є хто" всередині них.
 const PANEL_BOXES = ["_leftBox", "_centerBox", "_rightBox"];
 
 export class ElementRouter {
     constructor(extension) {
         this._extension = extension;
 
-        // Явне зіставлення "реальний Clutter-актор GNOME -> логічний ID".
-        // Це єдине джерело істини щодо того, "хто є хто" на панелі.
-        // Будується _buildIdentityMap() і більше ніде не вгадується.
         this._identityMap = new Map();
 
-        // Позиція, яку GNOME (або саме розширення) вказало для актора
-        // всередині його оригінального боксу через
-        // insert_child_at_index(child, index). Використовується, щоб
-        // зберігати правильний ліво-правий порядок елементів усередині
-        // однієї зони (наприклад, кількох іконок сторонніх розширень
-        // у "Інші ліві розширення"), а не порядок їхнього фактичного
-        // додавання під час виконання.
         this._positionHints = new WeakMap();
     }
 
@@ -62,22 +45,10 @@ export class ElementRouter {
                 this._extension._settings.get_string("panel-element-order"),
             );
             if (Array.isArray(order) && order.length) return order;
-        } catch (e) {
-            // Ignore invalid stored order and fall back to the default layout.
-        }
+        } catch (e) {}
         return this._getDefaultOrder();
     }
 
-    // =====================================================
-    // Явне зіставлення відомих системних акторів на логічні ID
-    // =====================================================
-
-    /**
-     * Реєструє актор (і, за наявності, його `.container`) під заданим
-     * логічним ID. У деяких версіях GNOME саме `.container`, а не сам
-     * об'єкт-індикатор, є тим Clutter-актором, що реально додається в
-     * бокс панелі — тож реєструємо обидва посилання на всякий випадок.
-     */
     _registerIdentity(actor, id) {
         if (!actor) return;
         this._identityMap.set(actor, id);
@@ -86,22 +57,6 @@ export class ElementRouter {
         }
     }
 
-    /**
-     * Будує (або перебудовує) карту "актор -> ID" на основі РЕАЛЬНИХ,
-     * живих об'єктів GNOME Shell (Main.panel.statusArea,
-     * Main.panel._activitiesButton, наш власний taskbar).
-     *
-     * Це єдине місце в класі, де відбувається розпізнавання системних
-     * елементів панелі. Раніше воно робилося за допомогою toString()
-     * та/або "хто в якому боксі лежав" — обидва способи ненадійні:
-     * назва ролі системного меню відрізняється між версіями GNOME
-     * ('quickSettings' у 45+, 'aggregateMenu' у старіших), а toString()
-     * GObject-акторів не гарантує наявності назви класу. Через це
-     * елементи, які не вдавалося точно розпізнати, автоматично
-     * потрапляли у "загальні" зони (left_center_extensions/
-     * right_extensions), навіть якщо насправді це були годинник чи
-     * системне меню.
-     */
     _buildIdentityMap() {
         this._identityMap.clear();
 
@@ -125,21 +80,6 @@ export class ElementRouter {
         }
     }
 
-    /**
-     * Повертає логічний ID для актора.
-     * 1. Якщо актор явно зареєстрований у карті ідентичності — точний ID.
-     * 2. Якщо карта ще не містить цей актор (наприклад, він з'явився вже
-     *    ПІСЛЯ побудови карти — так буває з таскбаром, який створюється
-     *    пізніше за перший виклик _extractOriginalChildren) — перебудовуємо
-     *    карту один раз і пробуємо ще.
-     * 3. Якщо актор і після цього лишається нерозпізнаним — це вже НЕ
-     *    спроба вгадати, чим він є (такої спроби більше немає в коді
-     *    взагалі), а свідомий дефолт для акторів, яких у принципі не
-     *    може бути в карті ідентичності — іконок сторонніх розширень.
-     *    GNOME не дає їм жодної постійної "ролі", тож єдиний розумний
-     *    орієнтир для них — секція панелі, куди їх спочатку додав сам
-     *    GNOME Shell.
-     */
     _getIdForChild(child, boxName) {
         if (!child) return null;
 
@@ -152,22 +92,14 @@ export class ElementRouter {
         id = this._identityMap.get(child);
         if (id) return id;
 
-        // Сторонній/невідомий актор — немає кращого орієнтира, ніж
-        // секція панелі, у якій GNOME Shell його розмістив.
         if (boxName === "_leftBox") return ID_LEFT_EXT;
         if (boxName === "_centerBox") return ID_LEFT_CENTER_EXT;
         return ID_RIGHT_EXT;
     }
 
-    // =====================================================
-    // Вилучення оригінальних дітей стандартних боксів панелі
-    // =====================================================
-
     _extractOriginalChildren() {
         this._extension._originalChildren.clear();
 
-        // Панель уже повністю зібрана GNOME Shell на цьому етапі —
-        // саме час зафіксувати "хто є хто".
         this._buildIdentityMap();
 
         PANEL_BOXES.forEach((boxName) => {
@@ -188,10 +120,8 @@ export class ElementRouter {
                     child._dtpOriginalParent = box;
                     child._dtpOriginalBoxName = boxName;
 
-                    // Фіксуємо позицію "як є"
                     this._positionHints.set(child, idx);
 
-                    // Підписка на знищення, щоб ніколи не рухати мертві актори
                     try {
                         if (!child._panelModifierDestroyId) {
                             child._panelModifierDestroyId = child.connect(
@@ -221,9 +151,7 @@ export class ElementRouter {
                         box.remove_child(child);
                     }
                     validChildren.push(child);
-                } catch (e) {
-                    // Ignore child removal errors during a layout refresh.
-                }
+                } catch (e) {}
             });
 
             this._extension._originalChildren.set(boxName, validChildren);
@@ -237,14 +165,12 @@ export class ElementRouter {
             const box = Main.panel[boxName];
             if (!box || box.is_finalized?.()) return;
 
-            // Зберігаємо оригінальні системні методи GNOME
             this._extension._originalBoxMethods[boxName] = {
                 add_child: box.add_child,
                 insert_child_at_index: box.insert_child_at_index,
                 remove_child: box.remove_child,
             };
 
-            // 1. Перехоплюємо додавання (без явної позиції — елемент іде в кінець)
             box.add_child = (child) => {
                 if (child === this._extension._masterContainer) {
                     this._extension._originalBoxMethods[boxName].add_child.call(
@@ -256,9 +182,6 @@ export class ElementRouter {
                 this._reparentChildSync(child, boxName);
             };
 
-            // 2. Перехоплюємо вставку за індексом — GNOME (або саме
-            // розширення) передає тут бажану позицію серед сусідів,
-            // тож обов'язково прокидаємо її далі, а не відкидаємо.
             box.insert_child_at_index = (child, index) => {
                 if (child === this._extension._masterContainer) {
                     this._extension._originalBoxMethods[
@@ -269,7 +192,6 @@ export class ElementRouter {
                 this._reparentChildSync(child, boxName, index);
             };
 
-            // 3. Перехоплюємо видалення (з очищенням кешу)
             box.remove_child = (child) => {
                 if (child === this._extension._masterContainer) {
                     this._extension._originalBoxMethods[
@@ -306,7 +228,6 @@ export class ElementRouter {
         Object.keys(this._extension._originalBoxMethods).forEach((boxName) => {
             const box = Main.panel[boxName];
             if (box && !box.is_finalized?.()) {
-                // Безпечне скидання методів замість оператора `delete`
                 if (this._extension._originalBoxMethods[boxName].add_child) {
                     box.add_child =
                         this._extension._originalBoxMethods[boxName].add_child;
@@ -332,13 +253,6 @@ export class ElementRouter {
         this._extension._originalBoxMethods = null;
     }
 
-    /**
-     * Вставляє актор у зону з урахуванням позиційної підказки (`hint`),
-     * а не завжди в кінець. Порівнює hint нового елемента з hint-ами вже
-     * присутніх у зоні сусідів і знаходить правильне місце вставки.
-     * Якщо підказки немає — просто додає в кінець (поведінка за
-     * замовчуванням для звичайного add_child без явної позиції).
-     */
     _isActorAlive(actor) {
         try {
             return (
@@ -369,9 +283,23 @@ export class ElementRouter {
     }
 
     _getOrderBucket(index) {
-        if (index >= 0 && index < 3) return { section: "left", offset: index, align: Clutter.ActorAlign.START };
-        if (index >= 3 && index < 6) return { section: "center", offset: index - 3, align: Clutter.ActorAlign.CENTER };
-        return { section: "right", offset: Math.min(2, Math.max(0, index - 6)), align: Clutter.ActorAlign.END };
+        if (index >= 0 && index < 3)
+            return {
+                section: "left",
+                offset: index,
+                align: Clutter.ActorAlign.START,
+            };
+        if (index >= 3 && index < 6)
+            return {
+                section: "center",
+                offset: index - 3,
+                align: Clutter.ActorAlign.CENTER,
+            };
+        return {
+            section: "right",
+            offset: Math.min(2, Math.max(0, index - 6)),
+            align: Clutter.ActorAlign.END,
+        };
     }
 
     _getHorizontalAlignForOrderIndex(index) {
@@ -407,7 +335,6 @@ export class ElementRouter {
                 this._positionHints.set(child, hint);
             }
 
-            // 1. Отримуємо зону безпосередньо (це вже готовий Clutter-актор)
             const targetZone = this._determineTargetZone(
                 child,
                 originalBoxName,
@@ -415,7 +342,7 @@ export class ElementRouter {
 
             if (targetZone) {
                 const currentParent = child.get_parent();
-                if (currentParent === targetZone) return; // Вже на своєму місці
+                if (currentParent === targetZone) return;
 
                 if (currentParent) {
                     currentParent.remove_child(child);
@@ -426,7 +353,6 @@ export class ElementRouter {
                     this._positionHints.get(child),
                 );
 
-                // 2. Додаємо до _originalChildren
                 const isSelfManaged = child === this._extension._taskbar;
 
                 if (
@@ -441,7 +367,6 @@ export class ElementRouter {
                     }
                 }
 
-                // Підписка на знищення для нових елементів
                 try {
                     if (!isSelfManaged && !child._panelModifierDestroyId) {
                         child._panelModifierDestroyId = child.connect(
@@ -468,7 +393,6 @@ export class ElementRouter {
                     }
                 } catch (e) {}
 
-                // Синхронізація видимості з безпечним відстеженням
                 if (!child._hasPanelModifierVisibilitySignal) {
                     child._hasPanelModifierVisibilitySignal = true;
 
@@ -499,21 +423,16 @@ export class ElementRouter {
                     child._visibilitySignalId = sigId;
                 }
             }
-        } catch (e) {
-            // Ignore reparenting errors while the layout is being rebuilt.
-        }
+        } catch (e) {}
     }
 
-    /**
-     * Перетворює позицію (0-8) у порядку елементів на конкретну зону.
-     * 0-2 -> ліва секція, 3-5 -> центральна, 6-8 -> права.
-     */
     _zoneForIndex(index) {
         const bucket = this._getOrderBucket(index);
         const section = this._extension._zones?.[bucket.section];
-        return section?.[bucket.offset] ?? (
-            this._extension._zones?.right?.[2] ||
-            this._extension._zones?.right?.[0]
+        return (
+            section?.[bucket.offset] ??
+            (this._extension._zones?.right?.[2] ||
+                this._extension._zones?.right?.[0])
         );
     }
 
@@ -547,7 +466,6 @@ export class ElementRouter {
             if (actorId === id) return actor;
         }
 
-        // Сторонній/невідомий елемент — шукаємо серед збережених оригінальних дітей
         for (const [boxName, children] of this._extension._originalChildren) {
             const found = children.find((child) => {
                 if (!child || child.is_finalized?.()) return false;
@@ -586,30 +504,6 @@ export class ElementRouter {
         });
     }
 
-    /**
-     * Публічна точка входу. Не виконує важку роботу одразу, а планує її
-     * на наступний idle-цикл головного циклу GLib.
-     *
-     * Чому це важливо: _doRefreshLayout() масово переносить (remove_child/
-     * add_child) ВСІ елементи панелі одразу. Якщо робити це синхронно
-     * прямо всередині обробника сигналу GSettings (changed::panel-element-
-     * order) — а саме так це раніше й викликалось з extension.js — операція
-     * може співпасти з моментом, коли Mutter/Clutter перебуває всередині
-     * власного цикла allocate/paint, або коли один з акторів (наприклад,
-     * іконка стороннього індикатора) саме перебуває у перехідному стані
-     * знищення. Маніпуляція деревом акторів у такий момент — це вже не
-     * "зловима" JS-помилка, а потенційний збій нативного коду. А оскільки
-     * під Wayland gnome-shell одночасно є і оболонкою, і композитором,
-     * такий збій обвалює всю графічну сесію (чорний екран -> LogIn),
-     * а не просто розширення.
-     *
-     * Перенесення роботи на idle-цикл (за межі стека сигналу GSettings) —
-     * стандартний спосіб уникнути цього класу проблем. Додатково: якщо
-     * налаштування змінюються швидко кілька разів поспіль (наприклад,
-     * при перетягуванні рядків у списку), кілька викликів _refreshLayout()
-     * "склеюються" в один реальний перерахунок замість N важких перебудов
-     * підряд.
-     */
     _refreshLayout() {
         if (this._refreshScheduled) return;
         this._refreshScheduled = true;
@@ -698,9 +592,7 @@ export class ElementRouter {
             } else {
                 item.obj.show();
             }
-        } catch (e) {
-            // Ignore item reordering failures during a layout refresh.
-        }
+        } catch (e) {}
     }
 
     _doRefreshLayout() {
@@ -726,9 +618,7 @@ export class ElementRouter {
                 children.forEach((c) => {
                     try {
                         if (this._isActorAlive(c)) zone.remove_child(c);
-                    } catch (e) {
-                        // Ignore failed child cleanup during a refresh.
-                    }
+                    } catch (e) {}
                 });
             });
         });

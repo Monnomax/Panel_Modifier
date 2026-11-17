@@ -46,8 +46,6 @@ export class WindowIndicators {
         this._downloadProgress = null;
         this._buttonContent = this._indicatorContainer.get_parent();
 
-        // Use a sibling in the BinLayout so the progress track overlays the
-        // existing indicator instead of being laid out beside its dots.
         this._progressTrack = new St.Widget({
             layout_manager: new Clutter.BinLayout(),
             style_class: "indicator-dot",
@@ -65,18 +63,12 @@ export class WindowIndicators {
             y_align: Clutter.ActorAlign.CENTER,
         });
         this._progressTrack.add_child(this._progressFill);
-        // Fix the fill to the track's left edge so width changes grow rightward.
         this._progressFill.set_position(0, 0);
         this._buttonContent?.add_child(this._progressTrack);
 
-        // Встановлюємо початкову позицію
         this._updatePosition();
     }
 
-    // Позиціонування рахується від горизонтального та вертикального
-    // центру кнопки таскбара. Зміщення задається в пікселях (-100..100):
-    //   X: 0 — центр, додатне — вправо, від'ємне — вліво;
-    //   Y: 0 — центр, додатне — вниз, від'ємне — вгору.
     _updatePosition() {
         const activeKey = this._isFocused ? "active" : "inactive";
 
@@ -87,7 +79,6 @@ export class WindowIndicators {
             `indicator-${activeKey}-offset-y`,
         );
 
-        // Контейнер завжди по центру кнопки, далі зсуваємо його трансформацією
         this._indicatorContainer.x_align = Clutter.ActorAlign.CENTER;
         this._indicatorContainer.y_align = Clutter.ActorAlign.CENTER;
 
@@ -134,7 +125,8 @@ export class WindowIndicators {
         const previous = this._downloadProgress;
         if (
             (!previous && !normalized) ||
-            (previous && normalized &&
+            (previous &&
+                normalized &&
                 previous.active === normalized.active &&
                 previous.progress === normalized.progress)
         ) {
@@ -153,7 +145,12 @@ export class WindowIndicators {
         return Math.max(1, Math.round(width || 48));
     }
 
-    _updateDownloadProgress(targetHeight, targetRadius, dynamicStyle, isFocused) {
+    _updateDownloadProgress(
+        targetHeight,
+        targetRadius,
+        dynamicStyle,
+        isFocused,
+    ) {
         const active = this._downloadProgress?.active === true;
 
         this._dots.forEach((dot) => {
@@ -173,7 +170,6 @@ export class WindowIndicators {
         const fill = this._progressFill;
         const progress = this._downloadProgress.progress;
 
-        // Keep the overlay aligned with the existing indicator's offsets.
         track.translation_x = this._indicatorContainer.translation_x;
         track.translation_y = this._indicatorContainer.translation_y;
 
@@ -190,15 +186,10 @@ export class WindowIndicators {
         );
         fill.set_height(targetHeight);
         fill.translation_y = 0;
-        // Scale around the left edge rather than animating width, which can
-        // appear centered by the actor's layout allocation.
         fill.set_pivot_point(0, 0.5);
 
         if (Number.isFinite(progress)) {
-            const fillScale = Math.max(
-                0,
-                Math.min(1, progress / 100),
-            );
+            const fillScale = Math.max(0, Math.min(1, progress / 100));
 
             fill.remove_transition("translation-x");
             fill.translation_x = 0;
@@ -213,7 +204,6 @@ export class WindowIndicators {
                 });
             }
         } else {
-            // Unknown total size: animate a short blue segment across the track.
             const fillWidth = Math.max(4, Math.round(iconWidth * 0.28));
             fill.remove_transition("scale-x");
             fill.scale_x = 1;
@@ -268,12 +258,13 @@ export class WindowIndicators {
         );
 
         const gap = 2;
-        const segmentWidth = windowCount > 0
-            ? Math.max(
-                1,
-                (targetWidth - gap * (windowCount - 1)) / windowCount,
-            )
-            : 0;
+        const segmentWidth =
+            windowCount > 0
+                ? Math.max(
+                      1,
+                      (targetWidth - gap * (windowCount - 1)) / windowCount,
+                  )
+                : 0;
 
         let dynamicStyle = "";
         if (
@@ -285,7 +276,6 @@ export class WindowIndicators {
                 dynamicStyle = `background-color: rgb(${color.r}, ${color.g}, ${color.b});`;
         }
 
-        // Оновлюємо позицію на випадок, якщо це потрібно під час загального оновлення
         this._updatePosition();
 
         while (this._dots.length < windowCount) {

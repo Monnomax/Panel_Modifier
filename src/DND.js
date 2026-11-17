@@ -8,10 +8,6 @@ class TaskbarDNDManager {
     constructor(taskbar, options = {}) {
         this._taskbar = taskbar;
 
-        // Необов'язковий хук: викликається з (true) на початку перетягування
-        // і з (false), коли перетягування повністю завершилось (drag-end,
-        // drag-cancelled). Використовується TaskBarViewport, щоб тимчасово
-        // призупиняти автоматичне зміщення контенту під час DND.
         this._onActiveChange =
             typeof options.onActiveChange === "function"
                 ? options.onActiveChange
@@ -20,7 +16,7 @@ class TaskbarDNDManager {
         this._placeholder = new St.Widget({
             style_class: "taskbar-placeholder",
             visible: false,
-            opacity: 0, // Початково невидимий
+            opacity: 0,
         });
 
         this._placeholder.set_x_expand(false);
@@ -31,12 +27,7 @@ class TaskbarDNDManager {
         this._dragSourceDestroyId = 0;
     }
 
-    /**
-     * КРИТИЧНО: Метод для повного очищення менеджера.
-     * Має викликатися з taskBar.js у методі destroy().
-     */
     destroy() {
-        // 1. Зупиняємо всі анімації на плейсхолдері
         if (this._placeholder) {
             this._placeholder.remove_all_transitions();
             if (this._placeholder.get_parent()) {
@@ -46,7 +37,6 @@ class TaskbarDNDManager {
             this._placeholder = null;
         }
 
-        // 2. Зупиняємо анімації на всіх іконках таскбару
         if (this._taskbar) {
             let children = this._taskbar.get_children();
             children.forEach((child) => {
@@ -55,7 +45,6 @@ class TaskbarDNDManager {
             });
         }
 
-        // 3. Відключаємо сигнал знищення кнопки, якщо він активний
         if (this._dragSourceButton && this._dragSourceDestroyId) {
             this._dragSourceButton.disconnect(this._dragSourceDestroyId);
             this._dragSourceDestroyId = 0;
@@ -158,7 +147,7 @@ class TaskbarDNDManager {
         let children = this._getChildren();
 
         children.forEach((child) => {
-            child.remove_all_transitions(); // ФІКС: очищення перед новою анімацією
+            child.remove_all_transitions();
             let offset = movingForward ? 0 : 0;
 
             child.set_translation(offset, 0, 0);
@@ -288,14 +277,10 @@ class TaskbarDNDManager {
                 if (isOutside) {
                     isDroppedOutside = true;
 
-                    // ХАК: Викрадаємо актор у системи DND
                     let dragActor = draggable._dragActor;
                     if (dragActor) {
-                        // Видаляємо посилання на актор з об'єкта перетягування.
-                        // Це змусить систему DND "забути" про нього і припинити будь-які автоматичні анімації.
                         draggable._dragActor = null;
 
-                        // Тепер ми єдині власники актора і можемо робити що завгодно
                         dragActor.remove_all_transitions();
                         dragActor.ease({
                             opacity: 0,

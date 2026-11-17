@@ -9,10 +9,6 @@ export class LifecycleManager {
         this._extension = extension;
     }
 
-    // =====================================================
-    // Запуск розширення (фінальна фаза, після старту GNOME Shell)
-    // =====================================================
-
     _finalizeStartup() {
         const ext = this._extension;
 
@@ -28,8 +24,6 @@ export class LifecycleManager {
         if (ext._autoHideManager) {
             ext._autoHideManager.enable();
         }
-
-        // Підписка на зміну розміру панелі видалена (не використовується)
     }
 
     _initializeTaskbar() {
@@ -46,10 +40,6 @@ export class LifecycleManager {
             ext._autoHideManager.enable();
         }
     }
-
-    // =====================================================
-    // Підключення сигналів налаштувань
-    // =====================================================
 
     _connectSignals() {
         const ext = this._extension;
@@ -118,12 +108,6 @@ export class LifecycleManager {
                 } else if (key === "panel-element-order") {
                     ext._elementRouter._refreshLayout();
                 } else if (key === "show-activities-button") {
-                    // _toggleActivities() сам по собі не завжди показує/ховає
-                    // кнопку коректно (актор міг бути перепризначений під
-                    // час _doRefreshLayout). _refreshLayout() перебудовує
-                    // розкладку і застосовує show-activities-button так само,
-                    // як це відбувається при зміні порядку елементів —
-                    // саме це надійно оновлює видимість кнопки.
                     this._applyAll();
                     ext._elementRouter._refreshLayout();
                 } else {
@@ -149,10 +133,6 @@ export class LifecycleManager {
             });
         }
     }
-
-    // =====================================================
-    // Застосування налаштувань
-    // =====================================================
 
     _applyInitialSettings() {
         const ext = this._extension;
@@ -193,7 +173,6 @@ export class LifecycleManager {
 
         this._updateTaskbarVisibility();
 
-        // --- Перемальовуємо іконки при зміні відступів чи висоти ---
         if (ext._taskbar && typeof ext._taskbar._redisplay === "function") {
             ext._taskbar._redisplay();
         } else if (

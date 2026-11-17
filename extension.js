@@ -122,20 +122,22 @@ export default class PanelLayoutExtension extends Extension {
     _startDownloadProgressMonitor() {
         if (this._downloadProgressMonitor) return;
 
-        this._downloadProgressMonitor = new DownloadProgressMonitor((snapshot) => {
-            const content = this._taskbar?._content;
-            if (!content?._buttons) return;
+        this._downloadProgressMonitor = new DownloadProgressMonitor(
+            (snapshot) => {
+                const content = this._taskbar?._content;
+                if (!content?._buttons) return;
 
-            for (const [app, button] of content._buttons.entries()) {
-                if (!button || button.is_finalized?.()) continue;
+                for (const [app, button] of content._buttons.entries()) {
+                    if (!button || button.is_finalized?.()) continue;
 
-                const progress = getDownloadProgressForApp(
-                    app.get_id?.(),
-                    snapshot,
-                );
-                button._indicators?.setDownloadProgress(progress, app);
-            }
-        });
+                    const progress = getDownloadProgressForApp(
+                        app.get_id?.(),
+                        snapshot,
+                    );
+                    button._indicators?.setDownloadProgress(progress, app);
+                }
+            },
+        );
         this._downloadProgressMonitor.enable();
     }
 

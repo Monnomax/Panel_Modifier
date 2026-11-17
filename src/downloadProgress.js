@@ -21,9 +21,6 @@ function readProgressSnapshot() {
             return {};
         }
 
-        // Native host snapshots have a heartbeat timestamp. Ignore stale state
-        // if the browser, extension, or native host was terminated abruptly.
-        // The demo script deliberately omits this field and remains compatible.
         if (
             Number.isFinite(parsed._updated_at) &&
             Date.now() / 1000 - parsed._updated_at > SNAPSHOT_MAX_AGE_SECONDS
@@ -33,7 +30,6 @@ function readProgressSnapshot() {
 
         return parsed;
     } catch (e) {
-        // A missing or partially written file means there is no progress to show.
         return {};
     }
 }

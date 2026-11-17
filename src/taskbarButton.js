@@ -80,7 +80,6 @@ export class TaskbarButtonManager {
             track_hover: true,
         });
 
-        // Зберігаємо цільову ширину для коректної анімації розширення
         btn._targetWidth = btnWidth;
 
         let btnContent = new St.Widget({
@@ -210,9 +209,6 @@ export class TaskbarButtonManager {
 
         let appSyncId = app.connect("windows-changed", btn._updateIndicators);
 
-        // Зберігаємо інстанси прив'язано до кнопки, щоб можна було
-        // міняти їх при зміні стану додатку (наприклад, коли закладка
-        // стає запущеною — показувати прев'ю замість тултіпа).
         btn._previewInstance = null;
         btn._tooltipInstance = null;
 
@@ -317,7 +313,6 @@ export class TaskbarButtonManager {
                     icon.set_margin_bottom(bottomPad);
                     icon.set_margin_left(leftPad);
 
-                    // Іконка під індикаторами.
                     btn._btnContent.insert_child_at_index(icon, 0);
                     btn._icon = icon;
                 }
@@ -344,8 +339,6 @@ export class TaskbarButtonManager {
 
         this._menu.setApp(app);
 
-        // Контекстне меню може прибрати hover із кнопки-джерела.
-        // Поки меню відкрите, утримуємо масштаб hover незалежно від hover state.
         const updateSourceScale = (isOpen) => {
             if (
                 !iconActor ||
@@ -364,8 +357,6 @@ export class TaskbarButtonManager {
         });
         this._menu.connect("destroy", () => updateSourceScale(false));
 
-        // Додаємо актор меню, якщо він присутній — різні версії AppMenu
-        // можуть надавати різні властивості (actor, menu.actor тощо).
         try {
             const menuActor =
                 this._menu.actor ||
@@ -375,22 +366,15 @@ export class TaskbarButtonManager {
             if (menuActor) {
                 Main.layoutManager.uiGroup.add_child(menuActor);
             }
-        } catch (e) {
-            // Якщо додавання актора не вдалось — дозволяємо menuManager
-            // взяти на себе управління додаванням.
-        }
+        } catch (e) {}
 
         try {
             Main.panel.menuManager.addMenu(this._menu);
-        } catch (e) {
-            // Ігнорувати — в різних GNOME API поведінка може відрізнятись.
-        }
+        } catch (e) {}
 
         try {
             this._menu.open(true);
-        } catch (e) {
-            // Ignore menu-opening failures; they are not user-facing errors.
-        }
+        } catch (e) {}
     }
 
     updateState(btn, app) {

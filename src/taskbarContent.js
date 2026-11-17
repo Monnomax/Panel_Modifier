@@ -35,7 +35,6 @@ function safeDisconnectSignal(obj, id) {
             message.includes("destroyed");
 
         if (!isExpectedDisposalError) {
-            // Ignore unexpected disposal errors silently.
         }
     }
 }
@@ -61,14 +60,8 @@ const TaskbarContent = GObject.registerClass(
             this._dragActive = false;
             this._pendingRedisplay = false;
 
-            // Хук, який виставляє TaskBarViewport (див. клас Taskbar нижче),
-            // щоб призупиняти автоскрол під час перетягування іконки.
             this._onDragActiveChange = null;
 
-            // Хук: викликається щоразу, коли в контенті з'являється НОВА
-            // кнопка (наприклад, щойно запущена непришпинена програма),
-            // щоб TaskBarViewport міг плавно проскролити її у видиму
-            // область, якщо вона опинилась за межами обрізаного viewport.
             this._onButtonAdded = null;
             this._dnd = new TaskbarDNDManager(this, {
                 onActiveChange: (active) => {
@@ -97,9 +90,6 @@ const TaskbarContent = GObject.registerClass(
                         let appFavorites = AppFavorites.getAppFavorites();
                         if (appFavorites) {
                             if (appFavorites.isFavorite(appId)) {
-                                // Переставляємо улюблену програму одним оновленням.
-                                // moveFavoriteToPos() спочатку видаляє програму,
-                                // а потім додає її знову, спричиняючи два оновлення GNOME.
                                 const key = appFavorites.FAVORITE_APPS_KEY;
                                 const favoriteIds =
                                     global.settings.get_strv(key);
@@ -136,13 +126,11 @@ const TaskbarContent = GObject.registerClass(
                 this._onAppStateChanged.bind(this),
             );
 
-            // Виправлення продуктивності: зміна фокусу більше не викликає повне перемальовування
             this._focusSig = global.display.connect(
                 "notify::focus-window",
                 this._updateFocusState.bind(this),
             );
 
-            // Слухачі налаштувань для динамічного оновлення розмірів та відступів
             this._settingsSignals = [];
             const resizeSettings = [
                 "icon-padding-vertical",
@@ -244,7 +232,6 @@ const TaskbarContent = GObject.registerClass(
                 if (!allApps.includes(app)) allApps.push(app);
             }
 
-            // 1. Знаходимо та анімовано видаляємо програми, яких більше немає в списку
             for (let [app, btn] of this._buttons.entries()) {
                 if (!allApps.includes(app)) {
                     this._removeAnimatedButton(btn);
@@ -252,10 +239,8 @@ const TaskbarContent = GObject.registerClass(
                 }
             }
 
-            // 2. Проходимо по актуальному списку: оновлюємо індекси існуючих або додаємо нові
             allApps.forEach((app, index) => {
                 if (this._buttons.has(app)) {
-                    // Кнопка вже існує, просто гарантуємо її правильну позицію в контейнері
                     let btn = this._buttons.get(app);
                     if (btn && !btn.is_finalized?.()) {
                         const currentIndex = this.get_children().indexOf(btn);
@@ -266,7 +251,6 @@ const TaskbarContent = GObject.registerClass(
                         this._buttonManager.updateState(btn, app);
                     }
                 } else {
-                    // Програми немає, створюємо нову кнопку та запускаємо анімацію появи
                     let btn = this._buttonManager.create(app);
                     this._buttons.set(app, btn);
                     this._addAnimatedButton(btn, index);
@@ -279,7 +263,6 @@ const TaskbarContent = GObject.registerClass(
         _removeAnimatedButton(button) {
             if (!button || button.is_finalized?.()) return;
 
-            // Фіксуємо поточну ширину, щоб уникнути стрибків через конфлікт із CSS
             button.width = button.width;
             button.remove_all_transitions();
 
@@ -301,7 +284,7 @@ const TaskbarContent = GObject.registerClass(
 
         _addAnimatedButton(button, index = -1) {
             button.opacity = 0;
-            button.width = 0; // Початкова нульова ширина
+            button.width = 0;
 
             if (index >= 0) {
                 this.insert_child_at_index(button, index);
@@ -309,7 +292,7 @@ const TaskbarContent = GObject.registerClass(
                 this.add_child(button);
             }
 
-            const target = button._targetWidth || 48; // Беремо збережену ширину або fallback
+            const target = button._targetWidth || 48;
 
             button.ease({
                 width: target,
@@ -318,15 +301,11 @@ const TaskbarContent = GObject.registerClass(
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
                 onComplete: () => {
                     if (!button.is_finalized?.()) {
-                        // Передаємо контроль назад CSS
                         button.width = -1;
                     }
                 },
             });
 
-            // Повідомляємо TaskBarViewport про нову кнопку — якщо вона
-            // опиниться поза видимою (обрізаною) частиною viewport, він
-            // плавно проскролить її у видиму область.
             if (typeof this._onButtonAdded === "function") {
                 this._onButtonAdded(button);
             }
@@ -344,7 +323,6 @@ const TaskbarContent = GObject.registerClass(
             this._buttonManager.destroy();
             this._buttonManager = null;
 
-            // 1. Знищуємо менеджер Drag & Drop.
             if (this._dnd) {
                 try {
                     this._dnd.destroy();
@@ -352,7 +330,6 @@ const TaskbarContent = GObject.registerClass(
                 this._dnd = null;
             }
 
-            // 2. Відключаємо сигнал зміни обраного.
             if (this._favsChangedId) {
                 safeDisconnectSignal(
                     AppFavorites.getAppFavorites(),
@@ -361,13 +338,11 @@ const TaskbarContent = GObject.registerClass(
                 this._favsChangedId = null;
             }
 
-            // 3. Відключаємо сигнал зміни фокусованого вікна.
             if (this._focusSig) {
                 safeDisconnectSignal(global.display, this._focusSig);
                 this._focusSig = null;
             }
 
-            // 4. Відключаємо сигнал зміни стану програм.
             if (this._appStateChangedId) {
                 safeDisconnectSignal(
                     Shell.AppSystem.get_default(),
@@ -376,7 +351,6 @@ const TaskbarContent = GObject.registerClass(
                 this._appStateChangedId = null;
             }
 
-            // 5. Відключаємо сигнали налаштувань.
             if (this._settingsSignals) {
                 for (const id of this._settingsSignals) {
                     safeDisconnectSignal(this._settings, id);
@@ -384,7 +358,6 @@ const TaskbarContent = GObject.registerClass(
                 this._settingsSignals = null;
             }
 
-            // 6. Видаляємо тимчасові закладки цього таскбару.
             const appFavorites = AppFavorites.getAppFavorites();
 
             if (this._temporaryFavorites) {
@@ -394,16 +367,13 @@ const TaskbarContent = GObject.registerClass(
                             if (appFavorites.isFavorite(appId)) {
                                 appFavorites.removeFavorite(appId);
                             }
-                        } catch (e) {
-                            // Ігноруємо помилки під час завершення роботи.
-                        }
+                        } catch (e) {}
                     }
                 }
 
                 this._temporaryFavorites.clear();
             }
 
-            // 7. Скасовуємо анімації та знищуємо дочірні актори.
             const children = this.get_children() || [];
 
             for (const child of children) {
@@ -415,10 +385,8 @@ const TaskbarContent = GObject.registerClass(
                 } catch (e) {}
             }
 
-            // 8. Звільняємо посилання на знищені кнопки.
             this._buttons.clear();
 
-            // 9. Від'єднуємо callback-функції від батьківського Taskbar.
             this._onDragActiveChange = null;
             this._onButtonAdded = null;
 
@@ -426,7 +394,6 @@ const TaskbarContent = GObject.registerClass(
             this._dragActive = false;
             this._pendingRedisplay = false;
 
-            // 11. Звільняємо посилання на розширення та налаштування.
             this._extension = null;
             this._settings = null;
 

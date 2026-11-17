@@ -6,6 +6,8 @@ import { WindowPreview } from "./preview.js";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import * as PointerWatcher from "resource:///org/gnome/shell/ui/pointerWatcher.js";
 
+const OVERVIEW_UNMINIMIZE_SETTLE_DELAY = 500;
+
 export class AutoHideManager {
     constructor(extension) {
         this._extension = extension;
@@ -21,6 +23,12 @@ export class AutoHideManager {
         this._autohideEnabled = false;
         this._intelligentAutohide = false;
         this._autohideDelay = 600;
+        this._overviewUnminimizePending = false;
+        this._overviewUnminimizeTimeoutId = null;
+        this._overviewUnminimizedWindow = null;
+        this._overviewUnminimizedWindowTimeoutId = null;
+        this._overviewExitPending = false;
+        this._overviewExitTimeoutId = null;
         this._motionThrottleId = null;
 
         this._signals = [];
@@ -34,6 +42,24 @@ export class AutoHideManager {
 
     enable() {
         this._loadSettings();
+
+        if (Main.panel) {
+            this._signals.push({
+                obj: Main.panel,
+                id: Main.panel.connect("notify::visible", () => {
+                    if (
+                        !this._autohideEnabled ||
+                        (!this._overviewExitPending &&
+                            !this._overviewUnminimizePending) ||
+                        !Main.panel.visible
+                    )
+                        return;
+
+                    Main.panel.visible = false;
+                }),
+            });
+        }
+
         this._updateStruts();
 
         this._signals.push({
@@ -48,7 +74,20 @@ export class AutoHideManager {
         this._signals.push({
             obj: global.display,
             id: global.display.connect("notify::focus-window", () => {
+                if (this._overviewExitPending) {
+                    if (global.display.get_focus_window())
+                        this._finishOverviewExit();
+                    return;
+                }
+
                 this.updateAutohide();
+            }),
+        });
+
+        this._signals.push({
+            obj: Main.overview,
+            id: Main.overview.connect("hiding", () => {
+                this._beginOverviewExit();
             }),
         });
 
@@ -154,6 +193,15 @@ export class AutoHideManager {
 
         this._signals.push({
             obj: global.window_manager,
+            id: global.window_manager.connect("unminimize", (_wm, actor) => {
+                const window = actor?.meta_window;
+                const title = window?.get_title?.() ?? "";
+                this._onOverviewWindowUnminimize(actor);
+            }),
+        });
+
+        this._signals.push({
+            obj: global.window_manager,
             id: global.window_manager.connect("size-change", () =>
                 this.updateAutohide(),
             ),
@@ -188,6 +236,22 @@ export class AutoHideManager {
             this._motionThrottleId = null;
         }
 
+        if (this._overviewUnminimizeTimeoutId) {
+            GLib.source_remove(this._overviewUnminimizeTimeoutId);
+            this._overviewUnminimizeTimeoutId = null;
+        }
+        this._overviewUnminimizePending = false;
+        if (this._overviewUnminimizedWindowTimeoutId) {
+            GLib.source_remove(this._overviewUnminimizedWindowTimeoutId);
+            this._overviewUnminimizedWindowTimeoutId = null;
+        }
+        this._overviewUnminimizedWindow = null;
+        if (this._overviewExitTimeoutId) {
+            GLib.source_remove(this._overviewExitTimeoutId);
+            this._overviewExitTimeoutId = null;
+        }
+        this._overviewExitPending = false;
+
         this._clearHideTimeout();
 
         if (this._signals && this._signals.length > 0) {
@@ -195,9 +259,7 @@ export class AutoHideManager {
                 if (sig.obj && sig.id && sig.obj.disconnect) {
                     try {
                         sig.obj.disconnect(sig.id);
-                    } catch (e) {
-                        // Об'єкт міг бути вже знищений системою
-                    }
+                    } catch (e) {}
                 }
             });
             this._signals = [];
@@ -306,6 +368,9 @@ export class AutoHideManager {
     }
 
     _onPointerUpdate(x, y) {
+        if (this._overviewUnminimizePending || this._overviewExitPending)
+            return;
+
         const panelBox = Main.layoutManager.panelBox;
         if (!panelBox) return;
 
@@ -443,6 +508,124 @@ export class AutoHideManager {
             panelBox.translation_y = 0;
             panelBox.visible = true;
         }
+    }
+
+    _beginOverviewExit() {
+        if (!this._autohideEnabled || this._overviewExitPending) return;
+
+        this._overviewExitPending = true;
+        this._clearShowTimeout();
+        this._clearHideTimeout();
+
+        if (this._overviewExitTimeoutId) {
+            GLib.source_remove(this._overviewExitTimeoutId);
+            this._overviewExitTimeoutId = null;
+        }
+
+        this._overviewExitTimeoutId = GLib.timeout_add(
+            GLib.PRIORITY_DEFAULT,
+            100,
+            () => {
+                if (
+                    Main.overview.visible ||
+                    Main.overview.animationInProgress ||
+                    this._overviewUnminimizePending
+                )
+                    return GLib.SOURCE_CONTINUE;
+
+                this._overviewExitTimeoutId = null;
+                this._finishOverviewExit(true);
+                return GLib.SOURCE_REMOVE;
+            },
+        );
+    }
+
+    _finishOverviewExit(force = false) {
+        if (!this._overviewExitPending) return false;
+        if (Main.overview.visible || Main.overview.animationInProgress)
+            return false;
+        if (this._overviewUnminimizePending) return false;
+        if (!force && !global.display.get_focus_window()) return false;
+
+        if (this._overviewExitTimeoutId) {
+            GLib.source_remove(this._overviewExitTimeoutId);
+            this._overviewExitTimeoutId = null;
+        }
+
+        this._overviewExitPending = false;
+        this._applyAutohideAfterOverview();
+        if (Main.panel) Main.panel.visible = true;
+        return true;
+    }
+
+    _applyAutohideAfterOverview() {
+        this._clearShowTimeout();
+        this._clearHideTimeout();
+
+        if (this._isMouseOverPanel()) {
+            this._showPanel(true);
+        } else if (this._shouldHideIntelligently()) {
+            this._hidePanel(true);
+        } else {
+            this._showPanel(true);
+        }
+    }
+
+    _rememberOverviewUnminimizedWindow(window) {
+        if (this._overviewUnminimizedWindowTimeoutId) {
+            GLib.source_remove(this._overviewUnminimizedWindowTimeoutId);
+            this._overviewUnminimizedWindowTimeoutId = null;
+        }
+
+        this._overviewUnminimizedWindow = window;
+        this._overviewUnminimizedWindowTimeoutId = GLib.timeout_add(
+            GLib.PRIORITY_DEFAULT,
+            2500,
+            () => {
+                this._overviewUnminimizedWindowTimeoutId = null;
+                this._overviewUnminimizedWindow = null;
+                return GLib.SOURCE_REMOVE;
+            },
+        );
+    }
+
+    _onOverviewWindowUnminimize(actor) {
+        if (!this._autohideEnabled) return;
+        if (!Main.overview.visible && !Main.overview.animationInProgress)
+            return;
+
+        const unminimizedWindow = actor?.meta_window;
+        if (unminimizedWindow)
+            this._rememberOverviewUnminimizedWindow(unminimizedWindow);
+
+        this._overviewUnminimizePending = true;
+        this._clearShowTimeout();
+        this._clearHideTimeout();
+
+        if (this._overviewUnminimizeTimeoutId) {
+            GLib.source_remove(this._overviewUnminimizeTimeoutId);
+            this._overviewUnminimizeTimeoutId = null;
+        }
+
+        this._overviewUnminimizeTimeoutId = GLib.timeout_add(
+            GLib.PRIORITY_DEFAULT,
+            OVERVIEW_UNMINIMIZE_SETTLE_DELAY,
+            () => {
+                if (Main.overview.visible || Main.overview.animationInProgress)
+                    return GLib.SOURCE_CONTINUE;
+
+                this._overviewUnminimizeTimeoutId = null;
+                this._overviewUnminimizePending = false;
+                if (this._overviewExitPending) {
+                    this._finishOverviewExit();
+                } else {
+                    this._applyAutohideAfterOverview();
+                    if (Main.panel) Main.panel.visible = true;
+                }
+
+                return GLib.SOURCE_REMOVE;
+            },
+        );
     }
 
     updateSettings() {
@@ -615,7 +798,13 @@ export class AutoHideManager {
             .sort_windows_by_stacking(allWorkspaceWindows)
             .reverse();
 
-        const focusWindow = global.display.get_focus_window();
+        const actualFocusWindow = global.display.get_focus_window();
+        const restoredWindow = this._overviewUnminimizedWindow;
+        const restoredIncluded = Boolean(
+            restoredWindow && windows.includes(restoredWindow),
+        );
+        const focusWindow =
+            actualFocusWindow ?? (restoredIncluded ? restoredWindow : null);
 
         if (this._autohideBehavior === "focused") {
             if (!focusWindow || !windows.includes(focusWindow)) return false;
@@ -685,6 +874,9 @@ export class AutoHideManager {
     }
 
     updateAutohide() {
+        if (this._overviewUnminimizePending || this._overviewExitPending)
+            return;
+
         if (Main.overview.visible || Main.overview.animationInProgress) return;
 
         if (this._isMouseOverPanel()) {

@@ -10,35 +10,19 @@ export class SystemUIManager {
         this._originalChangeMenu = null;
     }
 
-    // =====================================================
-    // Заборона "solid" фону панелі
-    // =====================================================
-
-    /**
-     * GNOME Shell автоматично додає клас 'solid'/'panel-solid' до Main.panel
-     * (через Panel._updateSolidStyle), коли є максимізоване або повноекранне
-     * вікно. Щоб панель завжди лишалась прозорою, ми:
-     *   1. Замінюємо _updateSolidStyle на no-op (перехоплює майбутні виклики).
-     *   2. Слухаємо 'notify::style-class' і негайно знімаємо класи, якщо
-     *      хтось їх все-одно додав (захист від сторонніх розширень).
-     */
     _preventSolidStyle() {
         const panel = Main.panel;
         if (!panel) return;
 
-        // 1. Перехоплення _updateSolidStyle
         if (
             typeof panel._updateSolidStyle === "function" &&
             !this._originalUpdateSolidStyle
         ) {
             this._originalUpdateSolidStyle =
                 panel._updateSolidStyle.bind(panel);
-            panel._updateSolidStyle = () => {
-                // no-op: не даємо Shell зробити панель "solid"
-            };
+            panel._updateSolidStyle = () => {};
         }
 
-        // 2. Реактивне зняття класів через сигнал
         if (!this._solidStyleSignalId) {
             this._solidStyleSignalId = panel.connect(
                 "notify::style-class",
@@ -48,7 +32,6 @@ export class SystemUIManager {
             );
         }
 
-        // Знімаємо класи одразу, якщо вони вже є
         this._stripSolidClasses();
     }
 
@@ -56,14 +39,10 @@ export class SystemUIManager {
         const panel = Main.panel;
         if (!panel) return;
 
-        // Знімаємо без умов — якщо класу нема, GNOME Shell ігнорує виклик
         panel.remove_style_class_name("solid");
         panel.remove_style_class_name("panel-solid");
     }
 
-    /**
-     * Відновлення оригінальної поведінки при disable().
-     */
     _restoreSolidStyle() {
         const panel = Main.panel;
         if (!panel) return;
@@ -76,39 +55,15 @@ export class SystemUIManager {
         if (this._originalUpdateSolidStyle) {
             panel._updateSolidStyle = this._originalUpdateSolidStyle;
             this._originalUpdateSolidStyle = null;
-            // Відновлюємо оригінальний стан — нехай Shell сам вирішить
             panel._updateSolidStyle();
         }
     }
 
-    // =====================================================
-    // Автоперемикання між відкритими меню при наведенні
-    // =====================================================
-
-    /**
-     * GNOME Shell (Main.panel.menuManager, PopupMenuManager) автоматично
-     * перемикає активне меню, коли курсор наводиться на сусідню кнопку
-     * статус-області, поки інше меню вже відкрите (наприклад: розкладка
-     * клавіатури -> Quick Settings), а також коли фокус клавіатури
-     * переходить на інше джерело меню. В обох випадках виклик іде через
-     * this._changeMenu(newMenu).
-     *
-     * ВАЖЛИВО: обробник наведення (_onCapturedEvent) підключається до
-     * сигналу captured-event через .bind(this) ще під час addMenu() —
-     * тобто задовго до enable() цього розширення для вже існуючих кнопок
-     * панелі (клавіатура, Quick Settings тощо). Патчити сам
-     * _onCapturedEvent заднім числом марно: вже підключений обробник
-     * назавжди посилається на стару функцію. Але всередині нього виклик
-     * this._changeMenu(...) — це динамічний пошук властивості на
-     * екземплярі під час кожного виклику, тож перевизначення саме
-     * _changeMenu спрацьовує коректно незалежно від того, коли сигнали
-     * було підключено.
-     */
     _patchMenuHoverSwitch() {
         const menuManager = Main.panel?.menuManager;
         if (!menuManager || typeof menuManager._changeMenu !== "function")
             return;
-        if (this._originalChangeMenu) return; // вже пропатчено
+        if (this._originalChangeMenu) return;
 
         this._originalChangeMenu = menuManager._changeMenu.bind(menuManager);
 
@@ -125,9 +80,6 @@ export class SystemUIManager {
         };
     }
 
-    /**
-     * Відновлення оригінальної поведінки при disable().
-     */
     _restoreMenuHoverSwitch() {
         const menuManager = Main.panel?.menuManager;
 
@@ -137,10 +89,6 @@ export class SystemUIManager {
 
         this._originalChangeMenu = null;
     }
-
-    // =====================================================
-    // Dash / Activities
-    // =====================================================
 
     _hideDash(hide) {
         let dash = Main.overview.dash;
@@ -156,14 +104,12 @@ export class SystemUIManager {
     }
 
     _toggleActivities(show) {
-        // Якщо параметр не передано, беремо його з налаштувань
         if (show === undefined && this._extension._settings) {
             show = this._extension._settings.get_boolean(
                 "show-activities-button",
             );
         }
 
-        // 1. Керування стандартним об'єктом у statusArea
         const act = Main.panel.statusArea["activities"];
         if (
             act &&
@@ -177,8 +123,6 @@ export class SystemUIManager {
             }
         }
 
-        // 2. Пошук кнопки всередині наших кастомних зон
-        // Це важливо, оскільки _refreshLayout переміщує кнопку в одну з зон
         if (this._extension._zones) {
             Object.values(this._extension._zones)
                 .flat()
@@ -189,7 +133,6 @@ export class SystemUIManager {
                         !zone.is_finalized()
                     ) {
                         zone.get_children().forEach((child) => {
-                            // КРИТИЧНО ВАЖЛИВО: пропускаємо знищені актори від вимкнених розширень
                             if (
                                 !child ||
                                 (typeof child.is_finalized === "function" &&
@@ -198,7 +141,6 @@ export class SystemUIManager {
                                 return;
                             }
 
-                            // Безпечно перевіряємо властивості тільки живих акторів
                             if (
                                 child === act ||
                                 (child.constructor &&
@@ -221,17 +163,20 @@ export class SystemUIManager {
         }
     }
 
-    // =====================================================
-    // Overview toggle
-    // =====================================================
-
     _handleOverviewToggle(isShowing) {
         if (!Main.panel) return;
 
-        Main.panel.visible = !(
-            isShowing &&
-            this._extension._settings.get_boolean("hide-panel-in-overview")
+        const hidePanelInOverview = this._extension._settings.get_boolean(
+            "hide-panel-in-overview",
         );
+
+        if (isShowing) {
+            Main.panel.visible = !hidePanelInOverview;
+        } else {
+            const autoHideManager = this._extension._autoHideManager;
+            autoHideManager?._beginOverviewExit();
+            Main.panel.visible = !autoHideManager?._autohideEnabled;
+        }
 
         if (this._extension._taskbar)
             this._extension._taskbar.setReactive(!isShowing);
@@ -242,21 +187,22 @@ export class SystemUIManager {
                 this._extension._layoutManager._applyPanelWidth();
             }
         } else {
-            // Коли ми виходимо з огляду, чекаємо черги (idle),
-            // щоб GNOME встиг скинути свої стилі, а потім зверху накладаємо наші.
             GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
                 if (this._extension._settings) {
-                    // Правильне делегування через lifecycleManager після рефакторингу
                     this._extension._lifecycleManager?._applyAll();
                 }
+
+                const autoHideManager = this._extension._autoHideManager;
+                if (autoHideManager?._overviewExitPending) {
+                    autoHideManager._finishOverviewExit();
+                } else if (Main.panel) {
+                    Main.panel.visible = true;
+                }
+
                 return GLib.SOURCE_REMOVE;
             });
         }
     }
-
-    // =====================================================
-    // Indicator visibility
-    // =====================================================
 
     _forceHideIndicator(indicatorName, forceHide) {
         const item = Main.panel.statusArea[indicatorName];
@@ -280,10 +226,6 @@ export class SystemUIManager {
             }
         }
     }
-
-    // =====================================================
-    // Panel position
-    // =====================================================
 
     _movePanel(position) {
         if (!Main.panel || !Main.layoutManager.panelBox) return;

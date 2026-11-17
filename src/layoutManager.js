@@ -91,15 +91,11 @@ export class LayoutManager {
             app = runningApps.length > 0 ? runningApps[0] : null;
         }
 
-        // Поки немає запущеної програми, адаптивний колір не застосовуємо:
-        // _composeMasterContainerStyle() тимчасово використає колір теми #panel.
         if (!app) return null;
 
         const averageColor = getAverageAppIconColor(app);
         if (!averageColor) return null;
 
-        // Пом'якшуємо колір іконки, змішуючи його з білим.
-        // Це знижує насиченість і робить відтінок пастельнішим.
         const pastelMix = 0.38;
         const iconColor = {
             r: Math.round(averageColor.r * (1 - pastelMix) + 255 * pastelMix),
@@ -109,9 +105,6 @@ export class LayoutManager {
 
         const k = intensity / 100;
 
-        // Інтенсивність змінює яскравість кольору іконки,
-        // не змішуючи його з кольором теми оболонки.
-        // Якщо колір іконки недоступний, використовуємо чорний, а не #panel.
         const r = iconColor ? Math.round(iconColor.r * k) : 0;
         const g = iconColor ? Math.round(iconColor.g * k) : 0;
         const b = iconColor ? Math.round(iconColor.b * k) : 0;
@@ -133,14 +126,15 @@ export class LayoutManager {
             if (adaptiveStyle) return `${baseStyle}${adaptiveStyle}`;
         }
 
-        // Адаптивний режим ще не має кольору іконки: використовуємо #panel.
         const base = this._getThemePanelBaseColor();
         const transparency = Math.max(
             0,
             Math.min(100, settings.get_int("panel-background-transparency")),
         );
-        // У режимі Off зберігаємо прозорість теми й додаємо прозорість повзунка.
-        const alpha = ((base.alpha / 255) * (100 - transparency) / 100).toFixed(3);
+        const alpha = (
+            ((base.alpha / 255) * (100 - transparency)) /
+            100
+        ).toFixed(3);
 
         return `${baseStyle}background-color: rgba(${Math.round(base.red)}, ${Math.round(base.green)}, ${Math.round(base.blue)}, ${alpha});`;
     }
@@ -288,7 +282,8 @@ export class LayoutManager {
         const widthPct = getNum("panel-width") || 100;
 
         const monitor =
-            Main.layoutManager.primaryMonitor || Main.layoutManager.focusMonitor;
+            Main.layoutManager.primaryMonitor ||
+            Main.layoutManager.focusMonitor;
         const monitorWidth = monitor ? monitor.width : global.stage.width;
 
         return {
@@ -311,7 +306,20 @@ export class LayoutManager {
     }
 
     _buildMasterContainerStyle(layoutState) {
-        const { h, mt, mb, ml, mr, rtl, rtr, rbl, rbr, isDynamic, widthPct, monitorWidth } = layoutState;
+        const {
+            h,
+            mt,
+            mb,
+            ml,
+            mr,
+            rtl,
+            rtr,
+            rbl,
+            rbr,
+            isDynamic,
+            widthPct,
+            monitorWidth,
+        } = layoutState;
         const horizontalPadding = 10;
 
         let styleStr =
@@ -325,13 +333,20 @@ export class LayoutManager {
 
         let containerXExpand = false;
         if (!isDynamic) {
-            const availW = Math.max(0, monitorWidth - ml - mr - horizontalPadding);
+            const availW = Math.max(
+                0,
+                monitorWidth - ml - mr - horizontalPadding,
+            );
             const calcW = Math.floor((availW * widthPct) / 100);
             containerXExpand = true;
             styleStr += `width:${calcW}px;`;
         }
 
-        return { styleStr, containerXExpand, containerXAlign: Clutter.ActorAlign.CENTER };
+        return {
+            styleStr,
+            containerXExpand,
+            containerXAlign: Clutter.ActorAlign.CENTER,
+        };
     }
 
     _applyPanelWidth() {
@@ -342,18 +357,8 @@ export class LayoutManager {
         )
             return;
 
-        // ── LAYOUT BATCHING ──────────────────────────────────────────────────────
-        // Фаза читання: збираємо ВСІ значення з GSettings та обчислюємо геометрію
-        // до першої мутації Clutter-акторів.
         const layoutState = this._readPanelLayoutState();
-        const {
-            h,
-            mt,
-            mb,
-            isDynamic,
-            taskbarPos,
-            totalH,
-        } = {
+        const { h, mt, mb, isDynamic, taskbarPos, totalH } = {
             ...layoutState,
             totalH: layoutState.h + layoutState.mt + layoutState.mb,
         };
@@ -361,7 +366,6 @@ export class LayoutManager {
         const { styleStr, containerXExpand, containerXAlign } =
             this._buildMasterContainerStyle(layoutState);
 
-        // Обчислюємо параметри секцій — теж до запису
         const sectionParams = {};
         ["left", "center", "right"].forEach((section) => {
             sectionParams[section] = this._getSectionLayoutParams(
@@ -371,8 +375,6 @@ export class LayoutManager {
             );
         });
 
-        // ── ФАЗА ЗАПИСУ (всі мутації Clutter в одному блоці) ────────────────────
-        // Панель — один set_height, один set style
         Main.panel.set_height(totalH);
         Main.panel.remove_style_class_name("panel-solid");
         Main.panel.remove_style_class_name("solid");
@@ -384,14 +386,12 @@ export class LayoutManager {
             Main.layoutManager.panelBox.set_height(totalH);
         }
 
-        // masterContainer — один блок властивостей
         const mc = this._extension._masterContainer;
         mc.set_x_expand(containerXExpand);
         mc.set_x_align(containerXAlign);
         this._masterContainerBaseStyle = styleStr;
         mc.style = this._composeMasterContainerStyle(styleStr);
 
-        // Секції — пакетно
         ["left", "center", "right"].forEach((key) => {
             const sec = this._extension._sections[key];
             if (!sec) return;
@@ -401,11 +401,8 @@ export class LayoutManager {
             sec.set_x_align(p.xAlign);
         });
 
-        // queue_relayout — єдиний виклик після всіх змін
         Main.panel.queue_relayout();
-        // ────────────────────────────────────────────────────────────────────────
 
-        // Синхронізуємо бар'єр автоприховування після ререндеру
         GLib.idle_add(GLib.PRIORITY_LOW, () => {
             if (this._extension._autoHideManager?.updateBarrierGeometry) {
                 this._extension._autoHideManager.updateBarrierGeometry();
@@ -413,18 +410,10 @@ export class LayoutManager {
             return GLib.SOURCE_REMOVE;
         });
 
-        // Будь-яка зміна ширини/полів панелі може змінити простір,
-        // доступний для TaskBarViewport (Dynamic Panel Width, зміна
-        // масштабу, margins тощо) — плануємо перерахунок його геометрії
-        // через єдиний координатор GeometryManager.
         if (this._extension._taskbar?._geometry?.scheduleMeasure) {
             this._extension._taskbar._geometry.scheduleMeasure();
         }
     }
-
-    // =====================================================
-    // Відновлення оригінальної розкладки панелі (disable())
-    // =====================================================
 
     _restoreOriginalLayout() {
         const ext = this._extension;
@@ -443,7 +432,7 @@ export class LayoutManager {
                             (typeof child.is_finalized !== "function" ||
                                 !child.is_finalized());
                     } catch (e) {
-                        isValid = false; // сам виклик is_finalized() на disposed об'єкті теж може кинути
+                        isValid = false;
                     }
 
                     if (isValid) {
@@ -459,9 +448,7 @@ export class LayoutManager {
                         box.add_child(child);
                         child.show();
                     }
-                } catch (e) {
-                    // Ignore restoration failures for already-disposed children.
-                }
+                } catch (e) {}
             });
         });
 
@@ -476,19 +463,6 @@ export class LayoutManager {
         this._restorePanelHeight();
     }
 
-    // =====================================================
-    // Скидання явної висоти панелі (disable())
-    // =====================================================
-
-    /**
-     * _applyPanelWidth() викликає Main.panel.set_height(totalH) та
-     * panelBox.set_height(totalH) — це встановлює ЯВНУ (fixed) висоту
-     * актора на рівні Clutter, яка має пріоритет над висотою з теми
-     * (#panel { height: ... } у gnome-shell.css). Скидання style/класів
-     * у disable() цього не торкається, бо set_height() — не CSS-властивість.
-     * Тому потрібно явно повернути висоту до природної (-1), щоб тема
-     * знову сама визначала розмір панелі.
-     */
     _restorePanelHeight() {
         if (Main.panel) {
             Main.panel.set_height(-1);
@@ -497,10 +471,6 @@ export class LayoutManager {
             Main.layoutManager.panelBox.set_height(-1);
         }
     }
-
-    // =====================================================
-    // Повне очищення акторів розмітки (disable())
-    // =====================================================
 
     _cleanup() {
         const ext = this._extension;
@@ -521,9 +491,7 @@ export class LayoutManager {
                     }
                     actor.destroy();
                 }
-            } catch (e) {
-                // Ignore disposal errors for already-destroyed actors.
-            }
+            } catch (e) {}
         };
 
         if (ext._zones) {

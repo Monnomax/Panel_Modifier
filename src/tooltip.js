@@ -23,44 +23,37 @@ export class Tooltip {
         this._themeContext = St.ThemeContext.get_for_stage(global.stage);
 
         if (autoBindEvents) {
-            this._enterId = this._actor.connect(
-                "enter-event",
-                () => this._onEnter()
+            this._enterId = this._actor.connect("enter-event", () =>
+                this._onEnter(),
             );
 
-            this._leaveId = this._actor.connect(
-                "leave-event",
-                () => this._onLeave()
+            this._leaveId = this._actor.connect("leave-event", () =>
+                this._onLeave(),
             );
         }
 
-        this._destroyId = this._actor.connect(
-            "destroy",
-            () => this.destroy()
+        this._destroyId = this._actor.connect("destroy", () => this.destroy());
+
+        this._overviewId = Main.overview.connect("showing", () =>
+            this._hideImmediate(),
         );
 
-        this._overviewId = Main.overview.connect(
-            "showing",
-            () => this._hideImmediate()
-        );
-
-        this._themeId = this._themeContext.connect(
-            "changed",
-            () => this._hideImmediate()
+        this._themeId = this._themeContext.connect("changed", () =>
+            this._hideImmediate(),
         );
     }
 
-    // =====================================================
-    // Animation
-    // =====================================================
-
     _getAnimationData(isHide) {
         const animType = this._settings?.get_int("tooltip-animation") ?? 6; // 6 = Ease Out Quad
-        const animData = AnimationManager.getAnimationData(animType, this._settings, 'tooltip');
+        const animData = AnimationManager.getAnimationData(
+            animType,
+            this._settings,
+            "tooltip",
+        );
 
         const speed = isHide
-            ? this._settings?.get_int("tooltip-hide-speed") ?? 300
-            : this._settings?.get_int("tooltip-show-speed") ?? 300;
+            ? (this._settings?.get_int("tooltip-hide-speed") ?? 300)
+            : (this._settings?.get_int("tooltip-show-speed") ?? 300);
 
         return {
             mode: isHide ? animData.hideMode : animData.showMode,
@@ -68,16 +61,10 @@ export class Tooltip {
         };
     }
 
-    // =====================================================
-    // Events
-    // =====================================================
-
     _onEnter() {
-        if (this._destroyed)
-            return;
+        if (this._destroyed) return;
 
-        if (!this._settings?.get_boolean("show-tooltips"))
-            return;
+        if (!this._settings?.get_boolean("show-tooltips")) return;
 
         this._clearTimer();
 
@@ -89,19 +76,17 @@ export class Tooltip {
             () => {
                 this._timerId = 0;
 
-                if (this._destroyed)
-                    return GLib.SOURCE_REMOVE;
+                if (this._destroyed) return GLib.SOURCE_REMOVE;
 
                 this._show();
 
                 return GLib.SOURCE_REMOVE;
-            }
+            },
         );
     }
 
     _onLeave() {
-        if (this._destroyed)
-            return;
+        if (this._destroyed) return;
 
         this._clearTimer();
 
@@ -114,32 +99,24 @@ export class Tooltip {
                 () => {
                     this._timerId = 0;
 
-                    if (this._destroyed)
-                        return GLib.SOURCE_REMOVE;
+                    if (this._destroyed) return GLib.SOURCE_REMOVE;
 
                     this._hideAnimated();
 
                     return GLib.SOURCE_REMOVE;
-                }
+                },
             );
         } else {
             this._hideAnimated();
         }
     }
 
-    // =====================================================
-    // Show / Hide
-    // =====================================================
-
     _show() {
-        if (this._destroyed)
-            return;
+        if (this._destroyed) return;
 
-        if (this._tooltip)
-            return;
+        if (this._tooltip) return;
 
-        if (!this._actor?.get_stage())
-            return;
+        if (!this._actor?.get_stage()) return;
 
         this._tooltip = new St.Label({
             style_class: "dash-label tooltip",
@@ -150,9 +127,7 @@ export class Tooltip {
             scale_y: 0.5,
         });
 
-        this._tooltip.set_offscreen_redirect(
-            Clutter.OffscreenRedirect.ALWAYS
-        );
+        this._tooltip.set_offscreen_redirect(Clutter.OffscreenRedirect.ALWAYS);
 
         this._tooltip.set_pivot_point(0.5, 0.5);
 
@@ -177,8 +152,7 @@ export class Tooltip {
     }
 
     _hideAnimated() {
-        if (!this._tooltip)
-            return;
+        if (!this._tooltip) return;
 
         const t = this._tooltip;
         this._tooltip = null;
@@ -192,8 +166,7 @@ export class Tooltip {
             duration: anim.duration,
             mode: Clutter.AnimationMode.LINEAR,
             onComplete: () => {
-                if (t)
-                    t.destroy();
+                if (t) t.destroy();
             },
         });
 
@@ -206,21 +179,15 @@ export class Tooltip {
     }
 
     _hideImmediate() {
-        if (!this._tooltip)
-            return;
+        if (!this._tooltip) return;
 
         this._tooltip.remove_all_transitions();
         this._tooltip.destroy();
         this._tooltip = null;
     }
 
-    // =====================================================
-    // Position
-    // =====================================================
-
     _updatePosition() {
-        if (!this._tooltip || !this._actor)
-            return;
+        if (!this._tooltip || !this._actor) return;
 
         const [x, y] = this._actor.get_transformed_position();
         const [w, h] = this._actor.get_transformed_size();
@@ -234,28 +201,16 @@ export class Tooltip {
         const panelPosition =
             this._settings?.get_string("panel-position") ?? "top";
 
-        if (panelPosition === "top")
-            tooltipY = y + h + 5;
-        else
-            tooltipY = y - th - 5;
+        if (panelPosition === "top") tooltipY = y + h + 5;
+        else tooltipY = y - th - 5;
 
         tooltipX = Math.max(
             10,
-            Math.min(
-                tooltipX,
-                global.stage.width - tw - 10
-            )
+            Math.min(tooltipX, global.stage.width - tw - 10),
         );
 
-        this._tooltip.set_position(
-            Math.floor(tooltipX),
-            Math.floor(tooltipY)
-        );
+        this._tooltip.set_position(Math.floor(tooltipX), Math.floor(tooltipY));
     }
-
-    // =====================================================
-    // Cleanup
-    // =====================================================
 
     _clearTimer() {
         if (this._timerId > 0) {
@@ -265,8 +220,7 @@ export class Tooltip {
     }
 
     destroy() {
-        if (this._destroyed)
-            return;
+        if (this._destroyed) return;
 
         this._destroyed = true;
 
@@ -275,28 +229,23 @@ export class Tooltip {
         this._hideImmediate();
 
         try {
-            if (this._enterId)
-                this._actor?.disconnect(this._enterId);
+            if (this._enterId) this._actor?.disconnect(this._enterId);
         } catch (e) {}
 
         try {
-            if (this._leaveId)
-                this._actor?.disconnect(this._leaveId);
+            if (this._leaveId) this._actor?.disconnect(this._leaveId);
         } catch (e) {}
 
         try {
-            if (this._destroyId)
-                this._actor?.disconnect(this._destroyId);
+            if (this._destroyId) this._actor?.disconnect(this._destroyId);
         } catch (e) {}
 
         try {
-            if (this._overviewId)
-                Main.overview.disconnect(this._overviewId);
+            if (this._overviewId) Main.overview.disconnect(this._overviewId);
         } catch (e) {}
 
         try {
-            if (this._themeId)
-                this._themeContext.disconnect(this._themeId);
+            if (this._themeId) this._themeContext.disconnect(this._themeId);
         } catch (e) {}
 
         this._enterId = 0;
