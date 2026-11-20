@@ -184,7 +184,7 @@ export class WindowPreview {
 
         this._container = new St.BoxLayout({
             style_class: "dash-label window-preview-container",
-            vertical: false,
+            orientation: Clutter.Orientation.HORIZONTAL,
             reactive: true,
             opacity: 0,
             scale_x: 0.5,
@@ -230,13 +230,13 @@ export class WindowPreview {
 
             const card = new St.BoxLayout({
                 style_class: "preview-window-card",
-                vertical: true,
+                orientation: Clutter.Orientation.VERTICAL,
                 reactive: true,
             });
 
             const header = new St.BoxLayout({
                 style_class: "preview-header",
-                vertical: false,
+                orientation: Clutter.Orientation.HORIZONTAL,
                 reactive: true,
             });
 

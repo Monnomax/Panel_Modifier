@@ -4,7 +4,6 @@ import Meta from "gi://Meta";
 import { AnimationManager } from "./animationManager.js";
 import { WindowPreview } from "./preview.js";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
-import * as PointerWatcher from "resource:///org/gnome/shell/ui/pointerWatcher.js";
 
 const OVERVIEW_UNMINIMIZE_SETTLE_DELAY = 500;
 
@@ -16,7 +15,6 @@ export class AutoHideManager {
         this._autohideBehavior =
             this._settings.get_string("autohide-behavior") || "all";
 
-        this._pointerWatch = null;
         this._autohideTimeoutId = null;
         this._ensureHideId = null;
         this._panelVisible = true;
@@ -171,10 +169,30 @@ export class AutoHideManager {
             }),
         });
 
-        this._pointerWatch = PointerWatcher.getPointerWatcher().addWatch(
-            100,
-            this._onPointerUpdate.bind(this),
-        );
+        const cursorTracker = global.backend?.get_cursor_tracker
+            ? global.backend.get_cursor_tracker()
+            : Meta.CursorTracker.get_for_display(global.display);
+
+        this._signals.push({
+            obj: cursorTracker,
+            id: cursorTracker.connect("position-invalidated", () => {
+                if (this._motionThrottleId !== null)
+                    return;
+
+                this._motionThrottleId = GLib.timeout_add(
+                    GLib.PRIORITY_DEFAULT,
+                    100,
+                    () => {
+                        this._motionThrottleId = null;
+
+                        const [x, y] = global.get_pointer();
+                        this._onPointerUpdate(x, y);
+
+                        return GLib.SOURCE_REMOVE;
+                    },
+                );
+            }),
+        });
 
         this._signals.push({
             obj: global.workspace_manager,
@@ -265,11 +283,6 @@ export class AutoHideManager {
             this._signals = [];
         }
 
-        if (this._pointerWatch) {
-            this._pointerWatch.remove();
-            this._pointerWatch = null;
-        }
-
         const panelBox = Main.layoutManager.panelBox;
         if (panelBox) {
             try {
@@ -312,6 +325,16 @@ export class AutoHideManager {
         this._showDelay = this._settings.get_int("autohide-show-delay") || 150;
     }
 
+    _syncPanelBoxReactivity(visible = this._panelVisible) {
+        const panelBox = Main.layoutManager.panelBox;
+        if (!panelBox) return;
+
+        const dynamicWidth =
+            this._settings.get_boolean("dynamic-panel-width");
+
+        panelBox.reactive = Boolean(visible && !dynamicWidth);
+    }
+
     _animatePanel(destination, immediate, duration, mode) {
         const panelBox = Main.layoutManager.panelBox;
         if (!panelBox) return;
@@ -341,6 +364,9 @@ export class AutoHideManager {
         }
 
         if (immediate) {
+            this._syncPanelBoxReactivity(
+                destination === this._yShow,
+            );
             panelBox.translation_y = destination;
             panelBox.opacity = targetOpacity;
             Main.layoutManager._queueUpdateRegions();
@@ -352,7 +378,9 @@ export class AutoHideManager {
             duration: duration,
             mode: mode,
             onComplete: () => {
-                panelBox.reactive = destination === this._yShow;
+                this._syncPanelBoxReactivity(
+                    destination === this._yShow,
+                );
                 if (destination !== this._yShow) {
                     panelBox.visible = false;
                 }

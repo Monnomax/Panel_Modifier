@@ -1,7 +1,7 @@
 import Cogl from "gi://Cogl";
 import GLib from "gi://GLib";
 import GObject from "gi://GObject";
-import Shell from "gi://Shell";
+import Clutter from "gi://Clutter";
 
 const FADE_DURATION_US = 500_000;
 const FRAME_INTERVAL_MS = 16;
@@ -33,7 +33,7 @@ cogl_color_out *= fade;
 `;
 
 export const TaskbarFadeEffect = GObject.registerClass(
-    class TaskbarFadeEffect extends Shell.GLSLEffect {
+    class TaskbarFadeEffect extends Clutter.ShaderEffect {
         _u = null;
         _leftFade = 0;
         _rightFade = 0;
@@ -42,28 +42,24 @@ export const TaskbarFadeEffect = GObject.registerClass(
         _fadeWidth = null;
         _animationId = 0;
 
-        vfunc_build_pipeline() {
-            const hook =
-                Shell.SnippetHook?.FRAGMENT ?? Cogl.SnippetHook.FRAGMENT;
-
-            this.add_glsl_snippet(hook, DECLARATIONS, CODE, false);
+        vfunc_get_static_snippet() {
+            return Cogl.Snippet.new(
+                Cogl.SnippetHook.FRAGMENT,
+                DECLARATIONS,
+                CODE,
+            );
         }
 
         _ensureUniforms() {
             if (this._u) return true;
 
-            try {
-                this._u = {
-                    left: this.get_uniform_location("left_fade"),
-                    right: this.get_uniform_location("right_fade"),
-                    width: this.get_uniform_location("fade_width"),
-                };
+            this._u = {
+                left: "left_fade",
+                right: "right_fade",
+                width: "fade_width",
+            };
 
-                return true;
-            } catch (e) {
-                this._u = null;
-                return false;
-            }
+            return true;
         }
 
         setFade(leftEnabled, rightEnabled, fadeWidthPx = 32) {

@@ -22,7 +22,7 @@ export class PanelSeparators {
     _createSeparators() {
         const createSep = () => {
             const box = new St.BoxLayout({
-                vertical: true,
+                orientation: Clutter.Orientation.VERTICAL,
                 y_align: Clutter.ActorAlign.CENTER,
                 x_align: Clutter.ActorAlign.CENTER,
                 x_expand: false,

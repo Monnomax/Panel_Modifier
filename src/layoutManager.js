@@ -10,6 +10,9 @@ export class LayoutManager {
         this._extension = extension;
         this._masterContainerBaseStyle = "";
         this._themePanelBaseColor = null;
+        this._originalPanelReactive = Main.panel
+            ? Main.panel.reactive
+            : null;
     }
 
     _invalidateThemePanelBaseColor() {
@@ -150,7 +153,7 @@ export class LayoutManager {
     _createMasterContainer() {
         this._extension._masterContainer = new St.BoxLayout({
             name: "panel",
-            vertical: false,
+            orientation: Clutter.Orientation.HORIZONTAL,
             x_expand: false,
             y_expand: true,
             style_class: "panel-layout-master",
@@ -158,21 +161,21 @@ export class LayoutManager {
 
         this._extension._sections.left = new St.BoxLayout({
             name: "panel-section-left",
-            vertical: false,
+            orientation: Clutter.Orientation.HORIZONTAL,
             x_expand: false,
             x_align: Clutter.ActorAlign.START,
         });
 
         this._extension._sections.center = new St.BoxLayout({
             name: "panel-section-center",
-            vertical: false,
+            orientation: Clutter.Orientation.HORIZONTAL,
             x_expand: false,
             x_align: Clutter.ActorAlign.CENTER,
         });
 
         this._extension._sections.right = new St.BoxLayout({
             name: "panel-section-right",
-            vertical: false,
+            orientation: Clutter.Orientation.HORIZONTAL,
             x_expand: false,
             x_align: Clutter.ActorAlign.END,
         });
@@ -196,7 +199,7 @@ export class LayoutManager {
             this._extension._zones[s] = zones.map((z) => {
                 const zone = new St.BoxLayout({
                     name: `zone-${s}-${z}`,
-                    vertical: false,
+                    orientation: Clutter.Orientation.HORIZONTAL,
                     x_expand: true,
                     x_align: Clutter.ActorAlign.CENTER,
                 });
@@ -363,6 +366,8 @@ export class LayoutManager {
             totalH: layoutState.h + layoutState.mt + layoutState.mb,
         };
 
+        this._setPanelInputPassthrough(isDynamic);
+
         const { styleStr, containerXExpand, containerXAlign } =
             this._buildMasterContainerStyle(layoutState);
 
@@ -383,7 +388,15 @@ export class LayoutManager {
             "border: none !important; box-shadow: none !important;";
 
         if (Main.layoutManager.panelBox) {
-            Main.layoutManager.panelBox.set_height(totalH);
+            const panelBox = Main.layoutManager.panelBox;
+            panelBox.set_height(totalH);
+
+            const autoHide = this._extension._autoHideManager;
+            if (autoHide?._syncPanelBoxReactivity) {
+                autoHide._syncPanelBoxReactivity();
+            } else {
+                panelBox.reactive = !isDynamic;
+            }
         }
 
         const mc = this._extension._masterContainer;
@@ -417,7 +430,10 @@ export class LayoutManager {
 
     _restoreOriginalLayout() {
         const ext = this._extension;
-        if (!ext._masterContainer) return;
+        if (!ext._masterContainer) {
+            this._restorePanelInputState();
+            return;
+        }
 
         ext._originalChildren.forEach((children, boxName) => {
             const box = Main.panel[boxName];
@@ -461,6 +477,7 @@ export class LayoutManager {
         }
 
         this._restorePanelHeight();
+        this._restorePanelInputState();
     }
 
     _restorePanelHeight() {
@@ -469,6 +486,28 @@ export class LayoutManager {
         }
         if (Main.layoutManager.panelBox) {
             Main.layoutManager.panelBox.set_height(-1);
+        }
+    }
+
+    _setPanelInputPassthrough(isDynamic) {
+        if (
+            !Main.panel ||
+            this._originalPanelReactive === null
+        ) {
+            return;
+        }
+
+        Main.panel.reactive = isDynamic
+            ? false
+            : this._originalPanelReactive;
+    }
+
+    _restorePanelInputState() {
+        if (
+            Main.panel &&
+            this._originalPanelReactive !== null
+        ) {
+            Main.panel.reactive = this._originalPanelReactive;
         }
     }
 
